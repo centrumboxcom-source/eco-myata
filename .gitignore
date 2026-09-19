@@ -1,0 +1,13 @@
+node_modules/
+.next/
+.env*
+!.env.example
+*.tsbuildinfo
+.sites-runtime/
+
+.open-next/
+dist/
+.wrangler/
+*.tar.gz
+
+.next-dev/
