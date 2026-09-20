@@ -10,6 +10,9 @@ const sql = (
 ).replace("create extension if not exists pgcrypto;", "");
 await db.exec(sql);
 await db.exec(await fs.readFile("supabase/migrations/002_launch.sql", "utf8"));
+await db.exec(
+  await fs.readFile("supabase/migrations/003_catalog_editor.sql", "utf8"),
+);
 await db.exec(await fs.readFile("supabase/seed.sql", "utf8"));
 assert.equal(
   (await db.query("select count(*)::int n from posts")).rows[0].n,
@@ -235,5 +238,85 @@ await assert.rejects(
 await db.exec("reset role");
 console.log(
   "PASS: purchase-verified store/product reviews and moderation protection.",
+);
+
+await db.exec(
+  "set role authenticated;select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000002',false)",
+);
+const product = (await db.query("select * from products where id='a'")).rows[0];
+const saveProduct = async (p) =>
+  (
+    await db.query("select save_catalog_product($1::jsonb,$2,$3) p", [
+      JSON.stringify(p),
+      "Private supplier details",
+      "VAT-TEST",
+    ])
+  ).rows[0].p;
+const saved = await saveProduct({
+  ...product,
+  slug: "almond-renamed",
+  sku: "ALMOND-TEST",
+  attributes: [{ name: "Origin", value: "Ukraine" }],
+});
+assert.equal(saved.internal_note, "Private supplier details");
+assert.equal(
+  (await db.query("select product_id from product_slug_history where slug='a'"))
+    .rows[0].product_id,
+  "a",
+);
+await assert.rejects(() => saveProduct(product), /PRODUCT_CHANGED/);
+await assert.rejects(
+  () => saveProduct({ ...saved, category_ids: ["missing"] }),
+  /INVALID_CATEGORY/,
+);
+await db.exec("reset role");
+await db.exec(
+  "insert into products(id,slug,name,category,price,weight,stock,image,track_stock,sku) values('unlimited','unlimited','Unlimited','test',10,'100 g',0,'/images/chia.jpg',false,'U-1')",
+);
+const unlimited = await call({
+  ...base,
+  requestId: crypto.randomUUID(),
+  promo: "",
+  items: [{ id: "unlimited", quantity: 4 }],
+});
+assert.equal(unlimited.total, 40);
+assert.equal(
+  (await db.query("select stock from products where id='unlimited'")).rows[0]
+    .stock,
+  0,
+);
+await db.exec("set role authenticated");
+await db.query("select update_order_status($1,$2)", [
+  unlimited.id,
+  "Скасовано",
+]);
+assert.equal(
+  (await db.query("select stock from products where id='unlimited'")).rows[0]
+    .stock,
+  0,
+);
+await db.exec(
+  "reset role;update products set available=false where id='unlimited'",
+);
+await assert.rejects(
+  () =>
+    call({
+      ...base,
+      requestId: crypto.randomUUID(),
+      promo: "",
+      items: [{ id: "unlimited", quantity: 1 }],
+    }),
+  /STOCK/,
+);
+await db.exec("set role anon");
+assert.equal((await db.query("select * from product_private")).rows.length, 0);
+await assert.rejects(
+  () =>
+    db.query("select save_catalog_product($1::jsonb)", [JSON.stringify(saved)]),
+  /permission denied/,
+);
+await db.exec("reset role");
+console.log(
+  "PASS: catalog editor transaction, private notes, stale inventory rejection, slug history, categories and tracked/untracked stock.",
 );
 await db.close();

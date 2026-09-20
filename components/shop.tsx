@@ -21,32 +21,37 @@ import {
   Instagram,
 } from "lucide-react";
 import { useShop } from "@/lib/store";
+import { inStock } from "@/lib/inventory";
 import { categories, money, type Product } from "@/lib/data";
 export function Logo() {
+  const { name, home } = useShopConfig();
   return (
     <Link href="/" className="logo" aria-label="ЕКО М’ЯТА — головна">
       <Leaf size={34} strokeWidth={1.5} />
       <span>
-        ЕКО М’ЯТА<small>КРАМНИЦЯ ПРИРОДНОЇ КОРИСТІ</small>
+        {name}
+        <small>{home.tagline}</small>
       </span>
     </Link>
   );
 }
 export function Header() {
-  const { freeShipping, categories } = useShopConfig();
+  const { freeShipping, categories, home } = useShopConfig();
   const [menu, setMenu] = useState(false);
   const [ready, setReady] = useState(false);
   const { items, setCartOpen } = useShop();
   useEffect(() => setReady(true), []);
   return (
     <>
-      <div className="announcement">
-        <Leaf size={13} /> Трохи природи у кожному дні{" "}
-        <span>
-          Безкоштовна доставка від {money(freeShipping)}{" "}
-          <ArrowRight size={13} />
-        </span>
-      </div>
+      {home.announcement_enabled && (
+        <div className="announcement">
+          <Leaf size={13} /> {home.announcement}{" "}
+          <span>
+            Безкоштовна доставка від {money(freeShipping)}{" "}
+            <ArrowRight size={13} />
+          </span>
+        </div>
+      )}
       <header className="header">
         <div className="container header-main">
           <button
@@ -106,13 +111,11 @@ export function Header() {
           <Link href="/catalog" className="catalog-nav">
             <Menu size={18} /> Каталог товарів <ChevronDown size={15} />
           </Link>
-          <Link href="/catalog?sort=new">Новинки</Link>
-          <Link href="/catalog?sale=1" className="sale-link">
-            Акційні пропозиції <span>SALE</span>
-          </Link>
-          <Link href="/#about">Про нас</Link>
-          <Link href="/blog">Блог</Link>
-          <Link href="/delivery">Оплата і доставка</Link>
+          {home.navigation.map((l) => (
+            <Link key={l.href + l.label} href={l.href}>
+              {l.label}
+            </Link>
+          ))}
           <span className="nav-note">
             <span /> З турботою про вас і природу
           </span>
@@ -133,8 +136,7 @@ export function Header() {
             {[
               ["/catalog", "Усі товари"],
               ...categories.map((c) => ["/catalog?category=" + c.id, c.name]),
-              ["/blog", "Блог"],
-              ["/delivery", "Оплата і доставка"],
+              ...home.navigation.map((l) => [l.href, l.label]),
               ["/account", "Мій кабінет"],
             ].map(([href, label]) => (
               <Link href={href} key={href} onClick={() => setMenu(false)}>
@@ -164,9 +166,10 @@ export function ProductCard({ product: p }: { product: Product }) {
           />
         </Link>
         <span className={"product-badge " + (p.old_price ? "discount" : "")}>
-          {p.old_price
-            ? `−${Math.round((1 - p.price / p.old_price) * 100)}%`
-            : "Натуральний склад"}
+          {p.badge ||
+            (p.old_price && p.old_price > p.price
+              ? `−${Math.round((1 - p.price / p.old_price) * 100)}%`
+              : "Натуральний склад")}
         </span>
         <button
           className={"favorite " + (favorites.includes(p.id) ? "selected" : "")}
@@ -197,7 +200,7 @@ export function ProductCard({ product: p }: { product: Product }) {
           </div>
           <button
             aria-label={"Купити " + p.name}
-            disabled={!p.stock}
+            disabled={!inStock(p)}
             onClick={() => add(p)}
           >
             <Plus size={20} />
@@ -350,52 +353,55 @@ export function CartDrawer() {
   );
 }
 export function Footer() {
+  const { home } = useShopConfig();
   const [message, setMessage] = useState("");
   return (
     <footer>
-      <div className="newsletter container">
-        <div>
-          <span className="eyebrow">ЛИСТИ З КОРИСТЮ</span>
-          <h2>Залишаймося на зв’язку 🌿</h2>
-          <p>Новинки, смачні ідеї та приємні пропозиції — у вашій пошті.</p>
-        </div>
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const form = e.currentTarget;
-            const email = new FormData(form).get("email");
-            try {
-              const r = await fetch("/api/subscribe", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email }),
-              });
-              const d = await r.json();
-              setMessage(d.message);
-              if (r.ok) form.reset();
-            } catch {
-              setMessage("Не вдалося з’єднатися. Спробуйте пізніше.");
-            }
-          }}
-        >
-          <div className="newsletter-input">
-            <input
-              type="email"
-              required
-              name="email"
-              placeholder="Ваша електронна пошта"
-              aria-label="Електронна пошта"
-            />
-            <button aria-label="Підписатися">
-              <ArrowRight size={22} />
-            </button>
+      {home.newsletter_enabled && (
+        <div className="newsletter container">
+          <div>
+            <span className="eyebrow">ЛИСТИ З КОРИСТЮ</span>
+            <h2>{home.newsletter_title}</h2>
+            <p>{home.newsletter_text}</p>
           </div>
-          <small>
-            {message ||
-              "Підписуючись, ви погоджуєтеся з політикою конфіденційності."}
-          </small>
-        </form>
-      </div>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const form = e.currentTarget;
+              const email = new FormData(form).get("email");
+              try {
+                const r = await fetch("/api/subscribe", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ email }),
+                });
+                const d = await r.json();
+                setMessage(d.message);
+                if (r.ok) form.reset();
+              } catch {
+                setMessage("Не вдалося з’єднатися. Спробуйте пізніше.");
+              }
+            }}
+          >
+            <div className="newsletter-input">
+              <input
+                type="email"
+                required
+                name="email"
+                placeholder="Ваша електронна пошта"
+                aria-label="Електронна пошта"
+              />
+              <button aria-label="Підписатися">
+                <ArrowRight size={22} />
+              </button>
+            </div>
+            <small>
+              {message ||
+                "Підписуючись, ви погоджуєтеся з політикою конфіденційності."}
+            </small>
+          </form>
+        </div>
+      )}
       <div className="footer-main container">
         <div>
           <Logo />
@@ -413,11 +419,11 @@ export function Footer() {
         </div>
         <div>
           <h4>Інформація</h4>
-          <Link href="/#about">Про нас</Link>
-          <Link href="/delivery">Оплата і доставка</Link>
-          <Link href="/privacy">Політика конфіденційності</Link>
-          <Link href="/returns">Повернення та відшкодування</Link>
-          <Link href="/terms">Умови продажу</Link>
+          {home.footer_links.map((l) => (
+            <Link key={l.href + l.label} href={l.href}>
+              {l.label}
+            </Link>
+          ))}
           <button
             className="text-button"
             onClick={() => window.dispatchEvent(new Event("eko:privacy"))}

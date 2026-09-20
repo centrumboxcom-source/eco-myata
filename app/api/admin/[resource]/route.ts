@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdmin, safeError } from "@/lib/server";
+import { categorySchema } from "@/lib/product-admin";
 import { productSchema } from "@/lib/validation";
 import { settingsSchema, launchIssues } from "@/lib/store-settings";
 import { merchantIssues } from "@/lib/merchant";
@@ -14,15 +15,7 @@ const image = z
   );
 const schemas = {
   products: productSchema,
-  categories: z.object({
-    id: z
-      .string()
-      .regex(/^[a-z0-9-]+$/)
-      .max(80),
-    name: z.string().min(2).max(100),
-    parent_id: z.string().nullable().optional(),
-    sort_order: z.coerce.number().int().optional(),
-  }),
+  categories: categorySchema,
   promocodes: z
     .object({
       id: z.uuid().optional(),
@@ -65,6 +58,13 @@ function errorResponse(e: unknown) {
     );
   const error = e as { message?: string; code?: string };
   const messages: Record<string, string> = {
+    PRODUCT_CHANGED:
+      "Товар змінився після відкриття: можливо, надійшло замовлення. Закрийте редактор, оновіть список і внесіть зміни повторно.",
+    SLUG_RESERVED:
+      "Ця адреса вже належить іншому товару або його старому посиланню.",
+    INVALID_CATEGORY: "Оберіть наявну категорію.",
+    INVALID_RELATED: "Схожий товар не знайдено або посилається на себе.",
+    CATEGORY_IN_USE: "Категорія використовується товарами або рекомендаціями.",
     CATEGORY_CYCLE: "Категорії не можуть посилатися одна на одну по колу.",
     REFUND_REQUIRED:
       "Спочатку поверніть оплату в банку та зафіксуйте повернення.",
@@ -115,20 +115,48 @@ export async function GET(
       0,
       Number(new URL(request.url).searchParams.get("page")) || 0,
     );
-    let query = client.from(resource).select("*");
-    if (resource === "orders")
-      query = query
+    let output: Record<string, any>[] = [];
+    if (resource === "orders") {
+      const { data, error } = await client
+        .from(resource)
+        .select("*")
         .order("created_at", { ascending: false })
-        .range(page * 200, page * 200 + 199);
-    else if (
-      resource === "products" ||
-      resource === "posts" ||
-      resource === "reviews"
-    )
-      query = query.order("created_at", { ascending: false }).limit(1000);
-    const { data, error } = await query;
-    if (error) throw error;
-    return NextResponse.json(data, {
+        .order("id")
+        .range(Math.floor(page) * 200, Math.floor(page) * 200 + 199);
+      if (error) throw error;
+      output = data;
+    } else {
+      for (let offset = 0; ; offset += 1000) {
+        const { data, error } = await client
+          .from(resource)
+          .select("*")
+          .order("id")
+          .range(offset, offset + 999);
+        if (error) throw error;
+        output.push(...data);
+        if (data.length < 1000) break;
+      }
+    }
+    if (resource === "products") {
+      const notes: Record<string, any>[] = [];
+      for (let offset = 0; ; offset += 1000) {
+        const { data, error } = await client
+          .from("product_private")
+          .select("*")
+          .order("product_id")
+          .range(offset, offset + 999);
+        if (error) throw Error("Потрібна міграція 003_catalog_editor.sql.");
+        notes.push(...data);
+        if (data.length < 1000) break;
+      }
+      const byId = new Map(notes.map((n) => [n.product_id, n]));
+      output = output.map((p) => ({
+        ...p,
+        internal_note: byId.get(p.id)?.internal_note || "",
+        tax_codes: byId.get(p.id)?.tax_codes || "",
+      }));
+    }
+    return NextResponse.json(output, {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (e) {
@@ -210,6 +238,17 @@ export async function POST(
             { message: "Для Google виправте: " + merchantIssues(p).join("; ") },
             { status: 400 },
           );
+        const { internal_note, tax_codes, ...product } = p;
+        const { data: saved, error: saveError } = await client.rpc(
+          "save_catalog_product",
+          {
+            p_product: product,
+            p_internal_note: internal_note,
+            p_tax_codes: tax_codes,
+          },
+        );
+        if (saveError) throw saveError;
+        return NextResponse.json(saved);
       }
     }
     const { data, error } =

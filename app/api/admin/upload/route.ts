@@ -5,6 +5,33 @@ export async function POST(request: Request) {
     const { client } = await requireAdmin();
     const form = await request.formData();
     const file = form.get("file");
+    const document = form.get("kind") === "document";
+    if (document) {
+      if (
+        !(file instanceof File) ||
+        file.size > 10 * 1024 * 1024 ||
+        file.type !== "application/pdf"
+      )
+        return NextResponse.json(
+          { message: "Оберіть PDF до 10 МБ." },
+          { status: 400 },
+        );
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (new TextDecoder().decode(bytes.slice(0, 5)) !== "%PDF-")
+        return NextResponse.json(
+          { message: "Некоректний PDF." },
+          { status: 400 },
+        );
+      const path = crypto.randomUUID() + ".pdf";
+      const { error } = await client.storage
+        .from("product-files")
+        .upload(path, bytes, { contentType: "application/pdf", upsert: false });
+      if (error) throw error;
+      return NextResponse.json({
+        url: client.storage.from("product-files").getPublicUrl(path).data
+          .publicUrl,
+      });
+    }
     if (
       !(file instanceof File) ||
       file.size > 5 * 1024 * 1024 ||

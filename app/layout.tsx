@@ -42,7 +42,12 @@ export default async function RootLayout({
     <html lang="uk">
       <body>
         <ShopConfigProvider
-          value={{ freeShipping: settings.free_shipping, categories }}
+          value={{
+            freeShipping: settings.free_shipping,
+            categories,
+            name: settings.name,
+            home: settings.homepage,
+          }}
         >
           <Analytics
             mode={settings.analytics_mode}

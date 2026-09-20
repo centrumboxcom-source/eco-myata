@@ -1,3 +1,4 @@
+import { inStock } from "./inventory";
 import type { Product } from "./data";
 export function validGtin(value: string) {
   if (!/^(\d{8}|\d{12}|\d{13}|\d{14})$/.test(value)) return false;
@@ -11,6 +12,7 @@ export function validGtin(value: string) {
 }
 export function merchantIssues(p: Product) {
   return [
+    p.noindex && "Індексацію товару заборонено",
     !p.name.trim() && "Назва",
     !p.description.trim() && "Опис",
     !p.image && "Фото",
@@ -53,7 +55,7 @@ export function merchantXml(products: Product[], origin: string, name: string) {
         tag("description", p.description) +
         tag("link", new URL("/product/" + p.slug, origin).href) +
         tag("image_link", new URL(p.image, origin).href) +
-        tag("availability", p.stock > 0 ? "in_stock" : "out_of_stock") +
+        tag("availability", inStock(p) ? "in_stock" : "out_of_stock") +
         tag("price", (sale ? p.old_price! : p.price).toFixed(2) + " UAH") +
         (sale ? tag("sale_price", p.price.toFixed(2) + " UAH") : "") +
         tag("condition", "new") +

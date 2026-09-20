@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { productExtras } from "./product-admin";
 import { validGtin } from "./merchant";
 export const checkoutSchema = z.object({
   name: z.string().trim().min(2).max(100),
@@ -26,6 +27,7 @@ export const checkoutSchema = z.object({
   requestId: z.uuid(),
 });
 export const productSchema = z.object({
+  ...productExtras.shape,
   id: z.string().min(1).max(80),
   slug: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string().min(2).max(160),
@@ -74,5 +76,5 @@ export const productSchema = z.object({
     .max(10)
     .default([]),
   featured: z.boolean(),
-  active: z.boolean().optional(),
+  active: z.boolean().default(true),
 });

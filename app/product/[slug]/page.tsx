@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { inStock } from "@/lib/inventory";
+import { resolveProduct } from "@/lib/resolve-product";
+import { notFound, permanentRedirect } from "next/navigation";
 import { Header, Footer, ProductCard } from "@/components/shop";
 import ProductDetail from "@/components/product-detail";
 import { getProducts } from "@/lib/catalog";
@@ -10,12 +12,13 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const p = (await getProducts()).find((p) => p.slug === slug);
+  const { product: p } = await resolveProduct(slug);
   return p
     ? {
         alternates: { canonical: "/product/" + p.slug },
-        title: p.name,
-        description: p.description,
+        title: p.seo_title || p.name,
+        robots: p.noindex ? { index: false, follow: true } : undefined,
+        description: p.seo_description || p.description,
         openGraph: {
           title: p.name,
           description: p.description,
@@ -36,8 +39,8 @@ export default async function Page({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const products = await getProducts();
-  const p = products.find((p) => p.slug === slug);
+  const { product: p, products, redirect } = await resolveProduct(slug);
+  if (p && redirect) permanentRedirect("/product/" + p.slug);
   if (!p) notFound();
   const settings = await getSettings();
   const origin = siteOrigin(settings);
@@ -61,7 +64,7 @@ export default async function Page({
       },
       priceCurrency: "UAH",
       price: p.price,
-      availability: p.stock
+      availability: inStock(p)
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
     },
@@ -80,20 +83,45 @@ export default async function Page({
           <Link href="/">Головна</Link> / <Link href="/catalog">Каталог</Link> /{" "}
           {p.name}
         </div>
-        <ProductDetail product={p} />
-        <section className="section" style={{ paddingBottom: 65 }}>
-          <div className="section-heading">
-            <h2>Вам також може сподобатися</h2>
-          </div>
-          <div className="product-grid">
-            {products
-              .filter((x) => x.id !== p.id)
-              .slice(0, 4)
-              .map((x) => (
-                <ProductCard key={x.id} product={x} />
-              ))}
-          </div>
-        </section>
+        <ProductDetail
+          key={p.id}
+          product={p}
+          variants={
+            p.variant_group
+              ? products.filter((x) => x.variant_group === p.variant_group)
+              : []
+          }
+        />
+        {p.related_mode !== "off" && (
+          <section className="section" style={{ paddingBottom: 65 }}>
+            <div className="section-heading">
+              <h2>Вам також може сподобатися</h2>
+            </div>
+            <div className="product-grid">
+              {products
+                .filter(
+                  (x) =>
+                    x.id !== p.id &&
+                    (p.related_mode === "manual"
+                      ? (p.related_ids || []).includes(x.id)
+                      : x.category === (p.related_category || p.category) ||
+                        x.category_ids?.includes(
+                          p.related_category || p.category,
+                        )),
+                )
+                .sort((a, b) =>
+                  p.related_mode === "manual"
+                    ? (p.related_ids || []).indexOf(a.id) -
+                      (p.related_ids || []).indexOf(b.id)
+                    : Number(b.featured) - Number(a.featured),
+                )
+                .slice(0, p.related_limit || 4)
+                .map((x) => (
+                  <ProductCard key={x.id} product={x} />
+                ))}
+            </div>
+          </section>
+        )}
       </main>
       <Footer />
     </>

@@ -10,7 +10,10 @@ export async function GET() {
     const s = await getSettings(),
       client = serviceClient();
     const { error } = client
-      ? await client.from("products").select("merchant_enabled,gtin").limit(1)
+      ? await client
+          .from("products")
+          .select("merchant_enabled,gtin,sku,track_stock")
+          .limit(1)
       : { error: new Error() };
     const origin = siteOrigin(s);
     const products = (await getProducts()).filter((p) => p.merchant_enabled);
@@ -21,10 +24,10 @@ export async function GET() {
       {
         checks: [
           {
-            name: "База та міграція 002",
+            name: "База та міграція 003",
             ok: !!client && !error,
             detail: error
-              ? "Виконайте міграцію 002 та перевірте серверний ключ."
+              ? "Виконайте міграцію 003 та перевірте серверний ключ."
               : "З’єднання й поля інтеграції доступні.",
           },
           {

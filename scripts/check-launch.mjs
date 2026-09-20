@@ -29,9 +29,9 @@ if (env.NEXT_PUBLIC_SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY) {
   );
   const { error } = await db
     .from("products")
-    .select("gtin,merchant_enabled")
+    .select("gtin,merchant_enabled,sku,category_ids,updated_at")
     .limit(1);
-  check("Міграція 002", !error);
+  check("Міграції 002 та 003", !error);
   const { data, error: e } = await db
     .from("settings")
     .select("value")

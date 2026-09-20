@@ -49,7 +49,7 @@ export default async function Community() {
         <div className="section-heading">
           <div>
             <span className="eyebrow">ВАШ ДОСВІД МАЄ ЗНАЧЕННЯ</span>
-            <h2>Теплі слова про корисне.</h2>
+            <h2>{s.homepage.reviews_title}</h2>
           </div>
           <Link href="/account" className="underlined-link">
             Мій кабінет <ArrowUpRight size={16} />
@@ -82,7 +82,7 @@ export default async function Community() {
         <div className="section-heading">
           <div>
             <span className="eyebrow">МАЛЕНЬКІ РАДОЩІ ЩОДНЯ</span>
-            <h2>Більше природи у вашій стрічці.</h2>
+            <h2>{s.homepage.instagram_title}</h2>
           </div>
           {instagram && (
             <a

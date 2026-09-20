@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { categoryBranch } from "@/lib/product-admin";
 import { searchScore } from "@/lib/search";
 import { useSearchParams } from "next/navigation";
 import { SlidersHorizontal, X, Search } from "lucide-react";
@@ -9,9 +10,11 @@ import { ProductCard } from "./shop";
 export default function Catalog({
   products,
   categories,
+  hideHeading = false,
 }: {
+  hideHeading?: boolean;
   products: Product[];
-  categories: { id: string; name: string; parent_id?: string }[];
+  categories: { id: string; name: string; parent_id?: string | null }[];
 }) {
   const params = useSearchParams();
   const [category, setCategory] = useState(params.get("category") || "");
@@ -34,7 +37,10 @@ export default function Catalog({
       products
         .filter(
           (p) =>
-            (!category || p.category === category) &&
+            (!category ||
+              categoryBranch(categories, category).some(
+                (id) => p.category === id || p.category_ids?.includes(id),
+              )) &&
             p.price >= min &&
             p.price <= max &&
             tags.every((t) => p.tags.includes(t)) &&
@@ -73,14 +79,16 @@ export default function Catalog({
   };
   return (
     <>
-      <h1 className="page-title">
-        {onlyFavorites
-          ? "Ваше обране"
-          : sale
-            ? "Приємні пропозиції"
-            : categories.find((c) => c.id === category)?.name ||
-              "Крамниця природної користі"}
-      </h1>
+      {!hideHeading && (
+        <h1 className="page-title">
+          {onlyFavorites
+            ? "Ваше обране"
+            : sale
+              ? "Приємні пропозиції"
+              : categories.find((c) => c.id === category)?.name ||
+                "Крамниця природної користі"}
+        </h1>
+      )}
       <p className="page-description">
         Прості інгредієнти. Справжній смак. Оберіть своє.
       </p>

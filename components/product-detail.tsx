@@ -1,4 +1,7 @@
 "use client";
+import Link from "next/link";
+import FormattedText from "./formatted-text";
+import { inStock, quantityLimit } from "@/lib/inventory";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -16,7 +19,13 @@ import { useShop } from "@/lib/store";
 import { useShopConfig } from "./shop-config";
 import AnalyticsEvent from "./analytics-event";
 import { item } from "@/lib/analytics";
-export default function ProductDetail({ product: p }: { product: Product }) {
+export default function ProductDetail({
+  product: p,
+  variants = [],
+}: {
+  product: Product;
+  variants?: Product[];
+}) {
   const { freeShipping, categories } = useShopConfig();
   const [photo, setPhoto] = useState(p.image);
   const [qty, setQty] = useState(1);
@@ -85,7 +94,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
           <h1>{p.name}</h1>
           <span className="availability">
             <Check size={15} />
-            {p.stock ? "Є в наявності" : "Немає в наявності"} · {p.weight}
+            {inStock(p) ? "Є в наявності" : "Немає в наявності"} · {p.weight}
           </span>
           <div className="tag-list">
             {p.tags.map((t) => (
@@ -94,7 +103,22 @@ export default function ProductDetail({ product: p }: { product: Product }) {
               </span>
             ))}
           </div>
-          <p>{p.description}</p>
+          {p.sku && <p className="field-help">Артикул: {p.sku}</p>}
+          {variants.length > 1 && (
+            <div className="store-variants">
+              <span>Оберіть варіант</span>
+              {variants.map((v) => (
+                <Link
+                  key={v.id}
+                  className={v.id === p.id ? "active" : ""}
+                  href={"/product/" + v.slug}
+                >
+                  {v.variant_label || v.weight || v.name}
+                </Link>
+              ))}
+            </div>
+          )}
+          <FormattedText text={p.description.split("\n\n")[0]} />
           <div className="detail-price">
             <strong>{money(p.price)}</strong>
             {p.old_price && <del>{money(p.old_price)}</del>}
@@ -109,7 +133,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
               </button>
               <span>{qty}</span>
               <button
-                onClick={() => setQty(Math.min(p.stock, qty + 1))}
+                onClick={() => setQty(Math.min(quantityLimit(p), qty + 1))}
                 aria-label="Більше"
               >
                 <Plus size={16} />
@@ -117,7 +141,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
             </div>
             <button
               className="button"
-              disabled={!p.stock}
+              disabled={!inStock(p)}
               onClick={() => add(p, qty)}
             >
               <ShoppingBag size={18} /> Додати в кошик
@@ -135,7 +159,7 @@ export default function ProductDetail({ product: p }: { product: Product }) {
           </div>
           <button
             className="button outline"
-            disabled={!p.stock}
+            disabled={!inStock(p)}
             onClick={() => {
               add(p, qty);
               setCartOpen(false);
@@ -162,6 +186,8 @@ export default function ProductDetail({ product: p }: { product: Product }) {
           ["description", "Опис товару"],
           ["ingredients", "Склад"],
           ["nutrition", "Харчова цінність"],
+          ["attributes", "Характеристики"],
+          ["files", "Документи"],
         ]
           .filter(([id]) => p.category !== "care" || id !== "nutrition")
           .map(([id, label]) => (
@@ -176,12 +202,30 @@ export default function ProductDetail({ product: p }: { product: Product }) {
       </div>
       <div className="detail-content">
         {tab === "description" ? (
-          <p>
-            {p.description} Зберігайте в сухому, прохолодному місці, захищеному
-            від сонячного світла. Термін придатності дивіться на пакованні.
-          </p>
+          <FormattedText text={p.description} />
         ) : tab === "ingredients" ? (
           <p>{p.ingredients}</p>
+        ) : tab === "attributes" ? (
+          <dl className="product-attributes">
+            {(p.attributes || []).map((a, i) => (
+              <div key={i}>
+                <dt>{a.name}</dt>
+                <dd>{a.value}</dd>
+              </div>
+            ))}
+            {!p.attributes?.length && <p>Характеристики уточнюються.</p>}
+          </dl>
+        ) : tab === "files" ? (
+          <div>
+            {(p.attachments || []).map((a) => (
+              <p key={a.url}>
+                <a href={a.url} target="_blank" rel="noreferrer">
+                  {a.name} ↗
+                </a>
+              </p>
+            ))}
+            {!p.attachments?.length && <p>Додаткових документів немає.</p>}
+          </div>
         ) : (
           <>
             <p>Орієнтовно на 100 г продукту:</p>

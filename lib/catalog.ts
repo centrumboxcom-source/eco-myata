@@ -1,3 +1,4 @@
+import { categorySchema, type Category } from "./product-admin";
 import { createClient } from "@supabase/supabase-js";
 import { products, categories, type Product } from "./data";
 export async function getProducts(): Promise<Product[]> {
@@ -22,17 +23,15 @@ export async function getProducts(): Promise<Product[]> {
 }
 
 export async function getCategories(): Promise<
-  {
-    id: string;
-    name: string;
-    parent_id?: string;
-    sort_order?: number;
-    color?: string;
-  }[]
+  (Category & { color?: string })[]
 > {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL,
     key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return categories;
+  if (!url || !key)
+    return categories.map((c) => ({
+      ...categorySchema.parse(c),
+      color: c.color,
+    }));
   const { data, error } = await createClient(url, key)
     .from("categories")
     .select("*")

@@ -1,6 +1,9 @@
+import { homeSchema, defaultHome } from "./content-settings";
 import { z } from "zod";
 const text = (n: number) => z.string().trim().max(n).default("");
 export const settingsSchema = z.object({
+  homepage: homeSchema.default(() => homeSchema.parse(defaultHome)),
+  homepage_draft: homeSchema.nullable().default(null),
   site_url: z
     .union([
       z.literal(""),

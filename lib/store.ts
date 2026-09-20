@@ -1,6 +1,7 @@
 "use client";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { inStock, quantityLimit } from "./inventory";
 import type { Product } from "./data";
 import { track, item } from "./analytics";
 type CartItem = { product: Product; quantity: number };
@@ -22,11 +23,11 @@ export const useShop = create<Store>()(
       favorites: [],
       cartOpen: false,
       add: (product, quantity = 1) => {
-        if (!product.stock || !Number.isFinite(quantity)) return;
+        if (!inStock(product) || !Number.isFinite(quantity)) return;
         const current =
           get().items.find((i) => i.product.id === product.id)?.quantity || 0;
         const next = Math.min(
-          product.stock,
+          quantityLimit(product),
           current + Math.max(1, Math.floor(quantity)),
         );
         const delta = next - current;
@@ -51,7 +52,7 @@ export const useShop = create<Store>()(
         if (!row) return;
         const next = Math.max(
           0,
-          Math.min(row.product.stock, Math.floor(quantity)),
+          Math.min(quantityLimit(row.product), Math.floor(quantity)),
         );
         const delta = next - row.quantity;
         if (delta)
@@ -72,8 +73,13 @@ export const useShop = create<Store>()(
         set((s) => ({
           items: s.items.flatMap((i) => {
             const product = products.find((p) => p.id === i.product.id);
-            return product && product.stock > 0
-              ? [{ product, quantity: Math.min(product.stock, i.quantity) }]
+            return product && inStock(product)
+              ? [
+                  {
+                    product,
+                    quantity: Math.min(quantityLimit(product), i.quantity),
+                  },
+                ]
               : [];
           }),
         })),

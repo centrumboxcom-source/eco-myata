@@ -2,12 +2,30 @@ import fs from "node:fs/promises";
 import ts from "typescript";
 import assert from "node:assert/strict";
 async function load(file) {
-  const s = ts.transpileModule(await fs.readFile(file, "utf8"), {
+  let s = ts.transpileModule(await fs.readFile(file, "utf8"), {
     compilerOptions: {
       module: ts.ModuleKind.ESNext,
       target: ts.ScriptTarget.ES2022,
     },
   }).outputText;
+  if (file === "lib/merchant.ts") {
+    const inventory = ts.transpileModule(
+      await fs.readFile("lib/inventory.ts", "utf8"),
+      {
+        compilerOptions: {
+          module: ts.ModuleKind.ESNext,
+          target: ts.ScriptTarget.ES2022,
+        },
+      },
+    ).outputText;
+    s = s.replace(
+      '"./inventory"',
+      JSON.stringify(
+        "data:text/javascript;base64," +
+          Buffer.from(inventory).toString("base64"),
+      ),
+    );
+  }
   return import(
     "data:text/javascript;base64," + Buffer.from(s).toString("base64")
   );

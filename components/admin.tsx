@@ -28,6 +28,13 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { Logo } from "./shop";
+import ProductEditor from "./admin-product-editor";
+import Products from "./admin-products";
+import Categories, { CategoryEditor } from "./admin-categories";
+import Homepage from "./admin-homepage";
+import Customers from "./admin-customers";
+import { productSchema } from "@/lib/validation";
+import { productExtras } from "@/lib/product-admin";
 import AdminSettings from "./admin-settings";
 import AdminImage from "./admin-image";
 import Readiness from "./admin-readiness";
@@ -43,6 +50,7 @@ import { browserClient } from "@/lib/supabase-browser";
 type Row = Record<string, any>;
 const nav = [
   ["dashboard", "Загальна інформація", LayoutDashboard],
+  ["homepage", "Головна сторінка", LayoutDashboard],
   ["products", "Товари", Package],
   ["orders", "Замовлення", ShoppingBag],
   ["categories", "Категорії", FolderTree],
@@ -50,6 +58,8 @@ const nav = [
   ["payments", "Оплата та доставка", Truck],
   ["posts", "Блог / Статті", BookOpen],
   ["reviews", "Відгуки", MessageCircle],
+  ["customers", "Клієнти", Users],
+  ["subscribers", "Підписники", Users],
   ["settings", "Налаштування", Settings],
   ["policies", "Дані продавця та умови", BookOpen],
   ["integrations", "Google та аналітика", ChartNoAxesCombined],
@@ -116,13 +126,12 @@ export default function Admin({ demo }: { demo: boolean }) {
   useEffect(() => {
     setSearch("");
     setStatus("");
-    setEditor(null);
     setMessage("");
   }, [view]);
   useEffect(() => {
     if (!editor && !remove && !detail) return;
     const close = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && !["products", "categories"].includes(view)) {
         setEditor(null);
         setRemove(null);
         setDetail(null);
@@ -184,8 +193,10 @@ export default function Admin({ demo }: { demo: boolean }) {
         setMessage("Зміни збережено.");
       }
       setEditor(null);
+      return true;
     } catch (e) {
       setMessage((e as Error).message);
+      return false;
     } finally {
       setBusy(false);
     }
@@ -207,7 +218,8 @@ export default function Admin({ demo }: { demo: boolean }) {
         ingredients: "",
         nutrition: { kcal: 0, protein: 0, fat: 0, carbs: 0 },
         featured: false,
-        active: true,
+        active: false,
+        additional_images: [],
       });
     else if (view === "categories")
       setEditor({ id: "", name: "", parent_id: null, sort_order: 0 });
@@ -231,6 +243,91 @@ export default function Admin({ demo }: { demo: boolean }) {
         published: false,
       });
   };
+
+  const closeEditor = () => {
+    if (busy) return;
+    if (
+      editor &&
+      !window.confirm("Закрити редактор? Незбережені зміни буде втрачено.")
+    )
+      return;
+    setEditor(null);
+    setMessage("");
+  };
+  const duplicate = (p: Row, variant = false) => {
+    const id = crypto.randomUUID();
+    const { created_at, updated_at, ...source } = p;
+    setEditor({
+      ...source,
+      id,
+      name: p.name + (variant ? "" : " (копія)"),
+      slug: p.slug + "-" + id.slice(0, 6),
+      sku: "",
+      active: false,
+      merchant_enabled: false,
+      variant_group: variant ? p.variant_group || p.id : "",
+      variant_label: variant ? "" : p.variant_label,
+      internal_note: "",
+    });
+  };
+  const refreshProducts = async () => {
+    if (demo) {
+      setMessage("Демонстраційні дані актуальні.");
+      return;
+    }
+    try {
+      const r = await fetch("/api/admin/products");
+      const d = await r.json();
+      if (!r.ok) throw Error(d.message);
+      setData((s) => ({ ...s, products: d }));
+    } catch (e) {
+      setMessage((e as Error).message);
+    }
+  };
+  const bulk = async (ids: string[], changes: Row) => {
+    setBusy(true);
+    try {
+      if (!demo) {
+        const r = await fetch("/api/admin/products/bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids, changes }),
+        });
+        if (!r.ok) throw Error((await r.json()).message);
+        await refreshProducts();
+      } else
+        setData((s) => ({
+          ...s,
+          products: s.products.map((p) =>
+            ids.includes(p.id) ? { ...p, ...changes } : p,
+          ),
+        }));
+      setMessage(
+        demo ? "Зміни застосовано в демоперегляді." : "Товари оновлено.",
+      );
+    } catch (e) {
+      setMessage((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const makeVariant = async (p: Row) => {
+    const parsed = productSchema.safeParse({
+      ...p,
+      variant_group: p.variant_group || p.id,
+    });
+    if (!parsed.success) {
+      setMessage(
+        parsed.error.issues
+          .map((i) => i.path.join(".") + ": " + i.message)
+          .join("; "),
+      );
+      return;
+    }
+    if (await save("products", parsed.data)) duplicate(parsed.data, true);
+  };
+  const categoryCreate = (parent?: string) =>
+    setEditor({ id: "", name: "", parent_id: parent || null, sort_order: 0 });
   const orders = data.orders || [];
   const recent = orders.filter(
     (o) =>
@@ -313,7 +410,15 @@ export default function Admin({ demo }: { demo: boolean }) {
             )}
             <button
               className={view === id ? "active" : ""}
-              onClick={() => setView(id)}
+              onClick={() => {
+                if (
+                  editor &&
+                  !window.confirm("Перейти до іншого розділу без збереження?")
+                )
+                  return;
+                setEditor(null);
+                setView(id);
+              }}
             >
               <Icon size={18} />
               {label}
@@ -350,7 +455,10 @@ export default function Admin({ demo }: { demo: boolean }) {
             постійного збереження підключіть Supabase.
           </p>
         )}
-        <div className="admin-page-heading">
+        <div
+          className="admin-page-heading"
+          style={editor ? { display: "none" } : undefined}
+        >
           <div>
             <h1>
               {view === "dashboard" ? "Вітаємо у вашому магазині 🌿" : title}
@@ -397,6 +505,84 @@ export default function Admin({ demo }: { demo: boolean }) {
         )}
         {loading ? (
           <p>Завантажуємо дані магазину…</p>
+        ) : editor && view === "products" ? (
+          <ProductEditor
+            key={editor.id}
+            value={editor}
+            categories={data.categories}
+            products={data.products}
+            demo={demo}
+            busy={busy}
+            message={message}
+            origin={settings.site_url || ""}
+            onChange={setEditor}
+            onSave={(p) => save("products", p)}
+            onClose={closeEditor}
+            onOpen={(p) => {
+              if (
+                window.confirm(
+                  "Відкрити інший варіант без збереження поточного?",
+                )
+              )
+                setEditor(p);
+            }}
+            onVariant={makeVariant}
+            onDuplicate={(p) => duplicate(p)}
+          />
+        ) : editor && view === "categories" ? (
+          <CategoryEditor
+            key={editor._existing ? editor.id : "new"}
+            value={editor}
+            categories={data.categories}
+            products={data.products}
+            demo={demo}
+            busy={busy}
+            message={message}
+            origin={settings.site_url || ""}
+            onChange={setEditor}
+            onSave={(c) => save("categories", c)}
+            onClose={closeEditor}
+            onProduct={(p) => {
+              if (
+                window.confirm("Перейти до товару без збереження категорії?")
+              ) {
+                setView("products");
+                setEditor(p);
+              }
+            }}
+          />
+        ) : view === "products" ? (
+          <Products
+            products={data.products}
+            categories={data.categories}
+            busy={busy}
+            onEdit={setEditor}
+            onDuplicate={(p) => duplicate(p)}
+            onBulk={bulk}
+            onRefresh={refreshProducts}
+          />
+        ) : view === "categories" ? (
+          <Categories
+            categories={data.categories}
+            products={data.products}
+            onEdit={setEditor}
+            onCreate={categoryCreate}
+            onRemove={setRemove}
+          />
+        ) : view === "homepage" ? (
+          <Homepage
+            settings={settings}
+            products={data.products}
+            demo={demo}
+            busy={busy}
+            onSave={(value) => save("settings", { id: "store", value })}
+          />
+        ) : ["customers", "subscribers"].includes(view) ? (
+          <Customers
+            key={view}
+            demo={demo}
+            subscribers={view === "subscribers"}
+          />
         ) : view === "readiness" ? (
           <Readiness demo={demo} />
         ) : ["integrations", "policies"].includes(view) ? (
@@ -770,7 +956,7 @@ export default function Admin({ demo }: { demo: boolean }) {
             )}
           </div>
         )}
-        {editor && (
+        {editor && !["products", "categories"].includes(view) && (
           <div
             className="admin-modal"
             role="dialog"

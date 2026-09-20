@@ -20,16 +20,23 @@ function distance(a: string, b: string): number {
   return previous[b.length];
 }
 export function searchScore(
-  product: Pick<Product, "name" | "tags" | "description">,
+  product: Pick<Product, "name" | "tags" | "description"> &
+    Partial<Pick<Product, "sku" | "search_keywords">>,
   query: string,
 ): number {
   const q = normalize(query);
   if (!q) return 1;
   const name = normalize(product.name);
   if (name.includes(q)) return 100 + (name.startsWith(q) ? 20 : 0);
-  const words = normalize(product.name + " " + product.tags.join(" ")).split(
-    /[^\p{L}\p{N}]+/u,
-  );
+  const words = normalize(
+    product.name +
+      " " +
+      product.tags.join(" ") +
+      " " +
+      (product.sku || "") +
+      " " +
+      (product.search_keywords || ""),
+  ).split(/[^\p{L}\p{N}]+/u);
   let score = 0;
   for (const term of q.split(" ")) {
     let best = 0;

@@ -1,4 +1,23 @@
 export type Product = {
+  active?: boolean;
+  sku?: string;
+  badge?: string;
+  seo_title?: string;
+  seo_description?: string;
+  search_keywords?: string;
+  noindex?: boolean;
+  category_ids?: string[];
+  attributes?: { name: string; value: string }[];
+  attachments?: { name: string; url: string }[];
+  related_mode?: "auto" | "manual" | "off";
+  related_ids?: string[];
+  related_category?: string;
+  related_limit?: number;
+  variant_group?: string;
+  variant_label?: string;
+  track_stock?: boolean;
+  available?: boolean;
+  updated_at?: string;
   brand?: string;
   gtin?: string;
   mpn?: string;
