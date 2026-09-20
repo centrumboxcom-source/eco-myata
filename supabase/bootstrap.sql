@@ -1,4 +1,3 @@
--- Fresh empty Supabase only. Includes 001, 002 and 003.
 begin;
 -- Run once in a new Supabase project's SQL editor.
 create extension if not exists pgcrypto;
@@ -329,5 +328,81 @@ drop policy if exists product_documents_read on storage.objects;
 create policy product_documents_read on storage.objects for select using(bucket_id='product-files');
 drop policy if exists product_documents_admin on storage.objects;
 create policy product_documents_admin on storage.objects for all to authenticated using(bucket_id='product-files' and public.is_admin()) with check(bucket_id='product-files' and public.is_admin());
+
+-- Configurable checkout. Snapshots preserve field labels on historical orders.
+alter table public.orders add column if not exists custom_fields jsonb not null default '{}'::jsonb;
+create or replace function public.place_order(p_payload jsonb) returns jsonb language plpgsql security definer set search_path=public as $$
+declare result orders%rowtype; item record; prod products%rowtype; quote jsonb; snapshots jsonb:='[]'; ipromo uuid; cfg jsonb; fld jsonb; val text; extras jsonb:='{}';
+begin
+ -- Same request key serializes double submissions before inventory is touched.
+ perform pg_advisory_xact_lock(hashtextextended(p_payload->>'requestId',0));
+ select * into result from orders where request_id=(p_payload->>'requestId')::uuid;
+ if found then return jsonb_build_object('id',result.id,'total',result.total);end if;
+ select coalesce(value->'commerce','{}'::jsonb) into cfg from settings where id='store';
+ for fld in select * from jsonb_array_elements(coalesce(cfg->'extra_fields','[]'::jsonb)) loop
+  val:=trim(coalesce(p_payload->'custom_fields'->>(fld->>'id'),''));
+  if length(val)>1000 or ((fld->>'required')::boolean and (val='' or (fld->>'type'='checkbox' and val<>'on'))) then raise exception 'CHECKOUT_FIELD_REQUIRED';end if;
+  if fld->>'type'='select' and val<>'' and not (fld->'options' ? val) then raise exception 'CHECKOUT_FIELD_INVALID';end if;
+  if fld->>'type'='checkbox' and val not in ('','on') then raise exception 'CHECKOUT_FIELD_INVALID';end if;
+  extras:=extras||jsonb_build_object(fld->>'id',jsonb_build_object('label',fld->>'label','value',case when fld->>'type'='checkbox' then case when val='on' then 'Так' else 'Ні' end else val end));
+ end loop;
+ -- Stable lock order prevents overselling and minimizes deadlocks.
+ perform 1 from products where id in(select x->>'id' from jsonb_array_elements(p_payload->'items') x) order by id for update;
+ if coalesce(p_payload->>'promo','')<>'' then perform 1 from promocodes where code=upper(trim(p_payload->>'promo')) for update;end if;
+ quote:=quote_cart(p_payload->'items',coalesce(p_payload->>'promo',''));
+ if (quote->>'total')::numeric<coalesce((cfg->>'minimum_order')::numeric,0) then raise exception 'MINIMUM_ORDER';end if;
+ ipromo:=(quote->>'promo_id')::uuid;
+ for item in select x->>'id' as id,sum((x->>'quantity')::integer) as qty from jsonb_array_elements(p_payload->'items') x group by x->>'id' loop
+  select * into prod from products where id=item.id;
+  if prod.track_stock then update products set stock=stock-item.qty where id=item.id;end if;
+  snapshots:=snapshots||jsonb_build_array(jsonb_build_object('id',prod.id,'name',prod.name,'price',prod.price,'quantity',item.qty,'weight',prod.weight,'sku',prod.sku,'variant_label',prod.variant_label,'track_stock',prod.track_stock));
+ end loop;
+ if ipromo is not null then update promocodes set uses=uses+1 where id=ipromo;end if;
+ insert into orders(request_id,user_id,name,last_name,phone,email,city,address,city_ref,warehouse_ref,delivery,payment,subtotal,total,discount,promo_id,items,comment,custom_fields)
+ values((p_payload->>'requestId')::uuid,(p_payload->>'user_id')::uuid,p_payload->>'name',p_payload->>'lastName',p_payload->>'phone',p_payload->>'email',p_payload->>'city',p_payload->>'address',p_payload->>'cityRef',p_payload->>'warehouseRef',p_payload->>'delivery',p_payload->>'payment',(quote->>'subtotal')::numeric,(quote->>'total')::numeric,(quote->>'discount')::numeric,ipromo,snapshots,p_payload->>'comment',extras) returning * into result;
+ return jsonb_build_object('id',result.id,'total',result.total);
+end $$;
+
+
+create table if not exists public.order_notifications(
+id uuid primary key default gen_random_uuid(),order_id uuid not null references public.orders(id) on delete cascade,
+channel text not null check(channel in ('telegram','staff_email','customer_email')),
+recipient text not null,sender text not null default '',subject text not null,body text not null,
+status text not null default 'pending' check(status in ('pending','sending','sent','failed','uncertain')),
+attempts integer not null default 0,claim_id uuid,claimed_at timestamptz,sent_at timestamptz,error text not null default '',
+created_at timestamptz not null default now(),unique(order_id,channel));
+alter table public.order_notifications enable row level security;
+create policy notification_admin_read on public.order_notifications for select to authenticated using(public.is_admin());
+grant select on public.order_notifications to authenticated;
+grant all on public.order_notifications to service_role;
+create index notification_pending on public.order_notifications(status,created_at);
+create or replace function public.queue_order_notifications() returns trigger language plpgsql security definer set search_path=public as $$
+declare cfg jsonb;shop text;summary text;title text;
+begin
+select value->'notifications',coalesce(value->>'name','Магазин') into cfg,shop from settings where id='store';
+title:='Замовлення '||left(new.id::text,8)||' · '||coalesce(shop,'Магазин');
+summary:=title||E'\nСума: '||new.total::text||' UAH'||E'\nОплата: '||new.payment||E'\nСтатус оплати перевіряйте в адмінці.';
+if coalesce((cfg->>'telegram_enabled')::boolean,false) then
+insert into order_notifications(order_id,channel,recipient,subject,body) values(new.id,'telegram',cfg->>'telegram_chat_id',title,summary);
+end if;
+if coalesce((cfg->>'staff_email_enabled')::boolean,false) then
+insert into order_notifications(order_id,channel,recipient,sender,subject,body) values(new.id,'staff_email',cfg->>'staff_email',cfg->>'sender_email',title,summary);
+end if;
+if coalesce((cfg->>'customer_email_enabled')::boolean,false) then
+insert into order_notifications(order_id,channel,recipient,sender,subject,body) values(new.id,'customer_email',new.email,cfg->>'sender_email',title,
+coalesce(cfg->>'email_heading','Дякуємо за замовлення!')||E'\n'||title||E'\nСума: '||new.total::text||' UAH'||E'\n'||coalesce((select string_agg((x->>'name')||' × '||(x->>'quantity'),E'\n') from jsonb_array_elements(new.items) x),'')||E'\n\nЗамовлення отримано. Цей лист не є підтвердженням оплати.'||E'\n'||coalesce(cfg->>'email_footer',''));
+end if;
+return new;
+end $$;
+create trigger queue_order_notifications after insert on public.orders for each row execute function public.queue_order_notifications();
+create or replace function public.claim_order_notifications() returns setof public.order_notifications language plpgsql security definer set search_path=public as $$
+begin
+update order_notifications set status='uncertain',error='Обробку перервано. Перевірте доставку перед повтором.' where status='sending' and claimed_at<now()-interval '5 minutes';
+return query with picked as(select id from order_notifications where status='pending' and attempts<5 order by created_at for update skip locked limit 5)
+update order_notifications n set status='sending',claim_id=gen_random_uuid(),claimed_at=now(),attempts=attempts+1 from picked where n.id=picked.id returning n.*;
+end $$;
+revoke all on function public.claim_order_notifications() from public,anon,authenticated;
+grant execute on function public.claim_order_notifications() to service_role;
+revoke all on function public.queue_order_notifications() from public,anon,authenticated;
 
 commit;

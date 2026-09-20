@@ -1,4 +1,5 @@
 "use client";
+import { usePrice } from "./shop-config";
 import { useEffect, useId, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -11,6 +12,7 @@ export default function HeaderSearch({
 }: {
   onNavigate?: () => void;
 }) {
+  const money = usePrice();
   const [query, setQuery] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [open, setOpen] = useState(false);

@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import HeaderSearch from "./header-search";
-import { useShopConfig } from "./shop-config";
+import { usePrice, useShopConfig } from "./shop-config";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -36,6 +37,7 @@ export function Logo() {
   );
 }
 export function Header() {
+  const money = usePrice();
   const { freeShipping, categories, home } = useShopConfig();
   const [menu, setMenu] = useState(false);
   const [ready, setReady] = useState(false);
@@ -152,10 +154,13 @@ export function Header() {
   );
 }
 export function ProductCard({ product: p }: { product: Product }) {
-  const { categories } = useShopConfig();
+  const { categories, commerce } = useShopConfig();
+  const router = useRouter();
+  const money = usePrice();
+  const [added, setAdded] = useState(false);
   const { add, favorites, toggleFavorite } = useShop();
   return (
-    <article className="product-card">
+    <article className={"product-card badge-" + commerce.badge_position}>
       <div className={"product-image image-" + p.id}>
         <Link href={"/product/" + p.slug}>
           <Image
@@ -165,12 +170,14 @@ export function ProductCard({ product: p }: { product: Product }) {
             sizes="(max-width: 640px) 45vw, 25vw"
           />
         </Link>
-        <span className={"product-badge " + (p.old_price ? "discount" : "")}>
-          {p.badge ||
-            (p.old_price && p.old_price > p.price
-              ? `−${Math.round((1 - p.price / p.old_price) * 100)}%`
-              : "Натуральний склад")}
-        </span>
+        {commerce.show_badges && (
+          <span className={"product-badge " + (p.old_price ? "discount" : "")}>
+            {p.badge ||
+              (p.old_price && p.old_price > p.price
+                ? `−${Math.round((1 - p.price / p.old_price) * 100)}%`
+                : "Натуральний склад")}
+          </span>
+        )}
         <button
           className={"favorite " + (favorites.includes(p.id) ? "selected" : "")}
           aria-label={"Додати в обране: " + p.name}
@@ -201,10 +208,23 @@ export function ProductCard({ product: p }: { product: Product }) {
           <button
             aria-label={"Купити " + p.name}
             disabled={!inStock(p)}
-            onClick={() => add(p)}
+            onClick={() => {
+              if (commerce.card_action === "product") {
+                router.push("/product/" + p.slug);
+                return;
+              }
+              add(p, 1, commerce.card_action === "drawer");
+              setAdded(true);
+            }}
           >
             <Plus size={20} />
-            <span>У кошик</span>
+            <span>
+              {commerce.card_action === "product"
+                ? "Докладніше"
+                : added
+                  ? "Додано"
+                  : "У кошик"}
+            </span>
           </button>
         </div>
       </div>
@@ -212,6 +232,7 @@ export function ProductCard({ product: p }: { product: Product }) {
   );
 }
 export function CartDrawer() {
+  const money = usePrice();
   const { freeShipping } = useShopConfig();
   const { items, cartOpen, setCartOpen, setQuantity } = useShop();
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -353,6 +374,7 @@ export function CartDrawer() {
   );
 }
 export function Footer() {
+  const { commerce } = useShopConfig();
   const { home } = useShopConfig();
   const [message, setMessage] = useState("");
   return (
@@ -436,7 +458,17 @@ export function Footer() {
           <Link href="/contacts">
             Зв’язатися з нами <ArrowRight size={14} />
           </Link>
-          <p>Пн–Пт · 9:00–18:00</p>
+          <p>{commerce.working_hours}</p>
+          {commerce.social_links.map((l, i) => (
+            <a
+              key={i}
+              href={l.href}
+              target="_blank"
+              rel={"noopener noreferrer" + (l.nofollow ? " nofollow" : "")}
+            >
+              {l.label}
+            </a>
+          ))}
           <Link href="/#community">
             <Instagram size={18} /> Наша спільнота
           </Link>

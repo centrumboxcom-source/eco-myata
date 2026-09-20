@@ -44,6 +44,7 @@ export default async function RootLayout({
         <ShopConfigProvider
           value={{
             freeShipping: settings.free_shipping,
+            commerce: settings.commerce,
             categories,
             name: settings.name,
             home: settings.homepage,

@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import AdminNotifications from "./admin-notifications";
+import AdminCommerce from "./admin-commerce";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -61,6 +63,7 @@ const nav = [
   ["customers", "Клієнти", Users],
   ["subscribers", "Підписники", Users],
   ["settings", "Налаштування", Settings],
+  ["notifications", "Сповіщення та листи", MessageCircle],
   ["policies", "Дані продавця та умови", BookOpen],
   ["integrations", "Google та аналітика", ChartNoAxesCombined],
   ["readiness", "Готовність до запуску", Check],
@@ -78,6 +81,7 @@ export default function Admin({ demo }: { demo: boolean }) {
     reviews: [],
   });
   const [settings, setSettings] = useState<Row>(defaults);
+  const savedSettings = useRef<Row>(defaults);
   const [loading, setLoading] = useState(!demo);
   const [loadError, setLoadError] = useState("");
   const [message, setMessage] = useState("");
@@ -111,9 +115,10 @@ export default function Admin({ demo }: { demo: boolean }) {
       .then((values) => {
         const next: Record<string, Row[]> = {};
         values.forEach(([key, value]) => {
-          if (key === "settings")
-            setSettings({ ...defaults, ...value[0]?.value });
-          else next[key] = value;
+          if (key === "settings") {
+            savedSettings.current = { ...defaults, ...value[0]?.value };
+            setSettings(savedSettings.current);
+          } else next[key] = value;
         });
         setData(next);
       })
@@ -145,8 +150,10 @@ export default function Admin({ demo }: { demo: boolean }) {
     setBusy(true);
     try {
       if (demo) {
-        if (resource === "settings") setSettings(record.value);
-        else
+        if (resource === "settings") {
+          savedSettings.current = record.value;
+          setSettings(record.value);
+        } else
           setData((s) => ({
             ...s,
             [resource]: s[resource].some((r) => r.id === record.id)
@@ -169,8 +176,10 @@ export default function Admin({ demo }: { demo: boolean }) {
         });
         const d = await r.json();
         if (!r.ok) throw new Error(d.message);
-        if (resource === "settings") setSettings(d.value);
-        else if (resource === "orders")
+        if (resource === "settings") {
+          savedSettings.current = d.value;
+          setSettings(d.value);
+        } else if (resource === "orders")
           setData((s) => ({
             ...s,
             orders: s.orders.map((o) => (o.id === record.id ? d : o)),
@@ -411,6 +420,19 @@ export default function Admin({ demo }: { demo: boolean }) {
             <button
               className={view === id ? "active" : ""}
               onClick={() => {
+                if (busy) return;
+                if (
+                  JSON.stringify(settings) !==
+                  JSON.stringify(savedSettings.current)
+                ) {
+                  if (
+                    !window.confirm(
+                      "Є незбережені налаштування. Перейти й скасувати зміни?",
+                    )
+                  )
+                    return;
+                  setSettings(savedSettings.current);
+                }
                 if (
                   editor &&
                   !window.confirm("Перейти до іншого розділу без збереження?")
@@ -583,6 +605,14 @@ export default function Admin({ demo }: { demo: boolean }) {
             demo={demo}
             subscribers={view === "subscribers"}
           />
+        ) : view === "notifications" ? (
+          <AdminNotifications
+            value={{ ...defaultSettings, ...settings }}
+            onChange={setSettings}
+            onSave={() => save("settings", { id: "store", value: settings })}
+            busy={busy}
+            demo={demo}
+          />
         ) : view === "readiness" ? (
           <Readiness demo={demo} />
         ) : ["integrations", "policies"].includes(view) ? (
@@ -595,7 +625,16 @@ export default function Admin({ demo }: { demo: boolean }) {
           />
         ) : view === "dashboard" ? (
           <AdminDashboard demo={demo} period={period} />
-        ) : ["settings", "payments"].includes(view) ? (
+        ) : view === "settings" ? (
+          <AdminCommerce
+            key={demo ? "demo-settings" : "settings"}
+            value={{ ...defaultSettings, ...settings }}
+            onChange={setSettings}
+            onSave={() => save("settings", { id: "store", value: settings })}
+            busy={busy}
+            demo={demo}
+          />
+        ) : ["payments"].includes(view) ? (
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -1543,6 +1582,13 @@ export default function Admin({ demo }: { demo: boolean }) {
                   Зафіксувати виконане повернення
                 </button>
               )}
+              {detail.custom_fields &&
+                Object.entries(detail.custom_fields).map(([key, entry]) => (
+                  <p key={key}>
+                    <strong>{(entry as any).label || key}: </strong>
+                    {String((entry as any).value ?? entry)}
+                  </p>
+                ))}
               {detail.comment && <p className="notice">{detail.comment}</p>}
               {detail.items.map((i: Row) => (
                 <div className="summary-row" key={i.id}>

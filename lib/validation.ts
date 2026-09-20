@@ -2,6 +2,10 @@ import { z } from "zod";
 import { productExtras } from "./product-admin";
 import { validGtin } from "./merchant";
 export const checkoutSchema = z.object({
+  custom_fields: z
+    .record(z.string().max(40), z.string().max(1000))
+    .refine((v) => Object.keys(v).length <= 8)
+    .default({}),
   name: z.string().trim().min(2).max(100),
   lastName: z.string().trim().min(2).max(100),
   phone: z.string().regex(/^\+380\d{9}$/),

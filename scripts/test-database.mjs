@@ -13,6 +13,12 @@ await db.exec(await fs.readFile("supabase/migrations/002_launch.sql", "utf8"));
 await db.exec(
   await fs.readFile("supabase/migrations/003_catalog_editor.sql", "utf8"),
 );
+await db.exec(
+  await fs.readFile("supabase/migrations/004_commerce_settings.sql", "utf8"),
+);
+await db.exec(
+  await fs.readFile("supabase/migrations/005_order_notifications.sql", "utf8"),
+);
 await db.exec(await fs.readFile("supabase/seed.sql", "utf8"));
 assert.equal(
   (await db.query("select count(*)::int n from posts")).rows[0].n,
@@ -318,5 +324,105 @@ await assert.rejects(
 await db.exec("reset role");
 console.log(
   "PASS: catalog editor transaction, private notes, stale inventory rejection, slug history, categories and tracked/untracked stock.",
+);
+
+await db.exec(
+  'update products set available=true where id=\'unlimited\';update settings set value=jsonb_set(value,\'{commerce}\',\'{"minimum_order":30,"extra_fields":[{"id":"gift","label":"Пакування","type":"select","required":true,"options":["Крафт"]}]}\') where id=\'store\'',
+);
+const fresh = {
+  ...base,
+  promo: "",
+  items: [{ id: "unlimited", quantity: 4 }],
+  custom_fields: { gift: "Крафт" },
+};
+await assert.rejects(
+  () => call({ ...fresh, requestId: crypto.randomUUID(), custom_fields: {} }),
+  /CHECKOUT_FIELD_REQUIRED/,
+);
+await assert.rejects(
+  () =>
+    call({
+      ...fresh,
+      requestId: crypto.randomUUID(),
+      custom_fields: { gift: "invalid" },
+    }),
+  /CHECKOUT_FIELD_INVALID/,
+);
+await assert.rejects(
+  () =>
+    call({
+      ...fresh,
+      requestId: crypto.randomUUID(),
+      items: [{ id: "unlimited", quantity: 2 }],
+    }),
+  /MINIMUM_ORDER/,
+);
+await db.exec(
+  'update settings set value=jsonb_set(value,\'{notifications}\',\'{"telegram_enabled":true,"telegram_chat_id":"123","customer_email_enabled":true,"sender_email":"orders@example.invalid","email_heading":"Дякуємо","email_footer":"До зустрічі"}\') where id=\'store\'',
+);
+const lastKey = crypto.randomUUID();
+const custom = await call({ ...fresh, requestId: lastKey });
+assert.equal(
+  (
+    await db.query(
+      "select custom_fields->'gift'->>'label' as label from orders where id=$1",
+      [custom.id],
+    )
+  ).rows[0].label,
+  "Пакування",
+);
+assert.equal(
+  (
+    await db.query(
+      "select count(*)::int n from order_notifications where order_id=$1",
+      [custom.id],
+    )
+  ).rows[0].n,
+  2,
+);
+await call({ ...fresh, requestId: lastKey });
+assert.equal(
+  (
+    await db.query(
+      "select count(*)::int n from order_notifications where order_id=$1",
+      [custom.id],
+    )
+  ).rows[0].n,
+  2,
+);
+const claimed = (await db.query("select * from claim_order_notifications()"))
+  .rows;
+assert.equal(claimed.length, 2);
+assert.equal(
+  (await db.query("select * from claim_order_notifications()")).rows.length,
+  0,
+);
+await db.exec(
+  "update order_notifications set claimed_at=now()-interval '10 minutes' where status='sending'",
+);
+assert.equal(
+  (await db.query("select * from claim_order_notifications()")).rows.length,
+  0,
+);
+assert.equal(
+  (
+    await db.query(
+      "select count(*)::int n from order_notifications where status='uncertain'",
+    )
+  ).rows[0].n,
+  2,
+);
+await db.exec("set role anon");
+assert.equal(
+  (await db.query("select * from order_notifications")).rows.length,
+  0,
+);
+await assert.rejects(
+  () => db.query("select * from claim_order_notifications()"),
+  /permission denied/,
+);
+await db.exec("reset role");
+console.log(
+  "PASS: checkout field validation, minimum after discount, historical field labels, notification queue deduplication, exclusive claims, uncertain delivery and private access.",
 );
 await db.close();

@@ -15,6 +15,12 @@ export async function GET() {
           .select("merchant_enabled,gtin,sku,track_stock")
           .limit(1)
       : { error: new Error() };
+    const commerceCheck = client
+      ? await client.from("orders").select("custom_fields").limit(1)
+      : { error: true };
+    const notificationCheck = client
+      ? await client.from("order_notifications").select("id").limit(1)
+      : { error: true };
     const origin = siteOrigin(s);
     const products = (await getProducts()).filter((p) => p.merchant_enabled);
     const invalid = products
@@ -23,6 +29,11 @@ export async function GET() {
     return NextResponse.json(
       {
         checks: [
+          {
+            name: "Налаштування кошика та сповіщення (004–005)",
+            ok: !commerceCheck.error && !notificationCheck.error,
+            detail: "Для оновленої бази виконайте міграції 004 та 005.",
+          },
           {
             name: "База та міграція 003",
             ok: !!client && !error,

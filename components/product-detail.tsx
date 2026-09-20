@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { money, type Product, categories } from "@/lib/data";
 import { useShop } from "@/lib/store";
-import { useShopConfig } from "./shop-config";
+import { usePrice, useShopConfig } from "./shop-config";
 import AnalyticsEvent from "./analytics-event";
 import { item } from "@/lib/analytics";
 export default function ProductDetail({
@@ -26,7 +26,8 @@ export default function ProductDetail({
   product: Product;
   variants?: Product[];
 }) {
-  const { freeShipping, categories } = useShopConfig();
+  const money = usePrice();
+  const { freeShipping, categories, commerce } = useShopConfig();
   const [photo, setPhoto] = useState(p.image);
   const [qty, setQty] = useState(1);
   const [tab, setTab] = useState("description");
@@ -94,7 +95,8 @@ export default function ProductDetail({
           <h1>{p.name}</h1>
           <span className="availability">
             <Check size={15} />
-            {inStock(p) ? "Є в наявності" : "Немає в наявності"} · {p.weight}
+            {inStock(p) ? commerce.stock_label : commerce.soldout_label} ·{" "}
+            {p.weight}
           </span>
           <div className="tag-list">
             {p.tags.map((t) => (
@@ -103,7 +105,9 @@ export default function ProductDetail({
               </span>
             ))}
           </div>
-          {p.sku && <p className="field-help">Артикул: {p.sku}</p>}
+          {commerce.show_sku && p.sku && (
+            <p className="field-help">Артикул: {p.sku}</p>
+          )}
           {variants.length > 1 && (
             <div className="store-variants">
               <span>Оберіть варіант</span>

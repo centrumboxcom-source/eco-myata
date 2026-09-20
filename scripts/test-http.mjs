@@ -10,6 +10,7 @@ assert.ok(catalog.length > 0);
 for (const route of [
   "/",
   "/catalog",
+  "/category/tea",
   "/checkout",
   "/admin",
   "/account",
@@ -28,6 +29,7 @@ for (const route of [
 ])
   await get(route);
 await get("/does-not-exist", 404);
+await get("/category/does-not-exist", 404);
 await get("/merchant.xml", 503);
 const delivery = await (await get("/api/delivery?q=Київ")).json();
 assert.equal(delivery.configured, false);
@@ -59,6 +61,8 @@ const order = {
 assert.equal((await post("/api/orders", order)).status, 503);
 assert.equal((await get("/api/admin/products", 503)).status, 503);
 assert.equal((await post("/api/payment", {})).status, 400);
+assert.equal((await post("/api/notifications/process", {})).status, 401);
+await get("/api/admin/notifications", 503);
 console.log(
   "PASS: storefront, product pages, checkout, admin, metadata routes, 404, validation and disconnected-backend protections.",
 );

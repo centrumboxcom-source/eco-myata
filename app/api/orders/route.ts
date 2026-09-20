@@ -1,3 +1,4 @@
+import { dispatchNotifications } from "@/lib/notifications";
 import { NextResponse } from "next/server";
 import { checkoutSchema } from "@/lib/validation";
 import { serviceClient, sessionClient } from "@/lib/server";
@@ -56,11 +57,17 @@ export async function POST(request: Request) {
   if (error)
     return NextResponse.json(
       {
-        message: error.message.includes("STOCK")
-          ? "На жаль, кількість товару на складі змінилася. Оновіть кошик."
-          : error.message.includes("PROMO")
-            ? "Промокод недійсний або більше не доступний."
-            : "Не вдалося оформити замовлення. Перевірте товари та спробуйте ще раз.",
+        message: error.message.includes("MINIMUM_ORDER")
+          ? "Мінімальна сума замовлення — " +
+            settings.commerce.minimum_order +
+            " ₴ після знижки."
+          : error.message.includes("CHECKOUT_FIELD")
+            ? "Заповніть додаткові поля замовлення. Якщо форму змінено, оновіть сторінку."
+            : error.message.includes("STOCK")
+              ? "На жаль, кількість товару на складі змінилася. Оновіть кошик."
+              : error.message.includes("PROMO")
+                ? "Промокод недійсний або більше не доступний."
+                : "Не вдалося оформити замовлення. Перевірте товари та спробуйте ще раз.",
       },
       { status: 400 },
     );
@@ -74,6 +81,7 @@ export async function POST(request: Request) {
       { message: "Замовлення збережено. Повторіть запит для підтвердження." },
       { status: 503 },
     );
+  await dispatchNotifications().catch(() => {});
   return NextResponse.json({
     id: data.id,
     total: data.total,

@@ -9,7 +9,7 @@ type Store = {
   items: CartItem[];
   favorites: string[];
   cartOpen: boolean;
-  add: (product: Product, quantity?: number) => void;
+  add: (product: Product, quantity?: number, openCart?: boolean) => void;
   setQuantity: (id: string, quantity: number) => void;
   clear: () => void;
   setCartOpen: (open: boolean) => void;
@@ -22,7 +22,7 @@ export const useShop = create<Store>()(
       items: [],
       favorites: [],
       cartOpen: false,
-      add: (product, quantity = 1) => {
+      add: (product, quantity = 1, openCart = true) => {
         if (!inStock(product) || !Number.isFinite(quantity)) return;
         const current =
           get().items.find((i) => i.product.id === product.id)?.quantity || 0;
@@ -43,7 +43,7 @@ export const useShop = create<Store>()(
                 i.product.id === product.id ? { product, quantity: next } : i,
               )
             : [...s.items, { product, quantity: next }],
-          cartOpen: true,
+          cartOpen: openCart,
         }));
       },
       setQuantity: (id, quantity) => {

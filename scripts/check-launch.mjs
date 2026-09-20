@@ -32,6 +32,13 @@ if (env.NEXT_PUBLIC_SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY) {
     .select("gtin,merchant_enabled,sku,category_ids,updated_at")
     .limit(1);
   check("Міграції 002 та 003", !error);
+  const commerce = await db.from("orders").select("custom_fields").limit(1);
+  check("Міграція 004", !commerce.error);
+  const notifications = await db
+    .from("order_notifications")
+    .select("id")
+    .limit(1);
+  check("Міграція 005", !notifications.error);
   const { data, error: e } = await db
     .from("settings")
     .select("value")

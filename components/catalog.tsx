@@ -6,6 +6,8 @@ import { useSearchParams } from "next/navigation";
 import { SlidersHorizontal, X, Search } from "lucide-react";
 import { type Product } from "@/lib/data";
 import { useShop } from "@/lib/store";
+import { useShopConfig } from "./shop-config";
+import { inStock } from "@/lib/inventory";
 import { ProductCard } from "./shop";
 export default function Catalog({
   products,
@@ -16,19 +18,22 @@ export default function Catalog({
   products: Product[];
   categories: { id: string; name: string; parent_id?: string | null }[];
 }) {
+  const { commerce } = useShopConfig();
+  const [page, setPage] = useState(1);
+  const ceiling = Math.max(100, ...products.map((p) => Math.ceil(p.price)));
   const params = useSearchParams();
   const [category, setCategory] = useState(params.get("category") || "");
   const [tags, setTags] = useState<string[]>([]);
   const [min, setMin] = useState(0);
-  const [max, setMax] = useState(1000);
-  const [sort, setSort] = useState(params.get("sort") || "popular");
+  const [max, setMax] = useState(ceiling);
+  const [sort, setSort] = useState(params.get("sort") || commerce.sort);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [query, setQuery] = useState(params.get("q") || "");
   const { favorites } = useShop();
   useEffect(() => {
     setQuery(params.get("q") || "");
     setCategory(params.get("category") || "");
-    setSort(params.get("sort") || "popular");
+    setSort(params.get("sort") || commerce.sort);
   }, [params]);
   const sale = params.get("sale") === "1",
     onlyFavorites = params.get("favorites") === "1";
@@ -41,6 +46,7 @@ export default function Catalog({
               categoryBranch(categories, category).some(
                 (id) => p.category === id || p.category_ids?.includes(id),
               )) &&
+            (!commerce.hide_unavailable || inStock(p)) &&
             p.price >= min &&
             p.price <= max &&
             tags.every((t) => p.tags.includes(t)) &&
@@ -59,6 +65,8 @@ export default function Catalog({
         ),
     [
       products,
+      commerce.hide_unavailable,
+      categories,
       category,
       min,
       max,
@@ -70,11 +78,27 @@ export default function Catalog({
       sort,
     ],
   );
+  useEffect(
+    () => setPage(1),
+    [
+      category,
+      min,
+      max,
+      tags,
+      query,
+      sort,
+      sale,
+      onlyFavorites,
+      commerce.page_size,
+    ],
+  );
+  const pages = Math.max(1, Math.ceil(filtered.length / commerce.page_size));
+  const currentPage = Math.min(page, pages);
   const reset = () => {
     setCategory("");
     setTags([]);
     setMin(0);
-    setMax(1000);
+    setMax(ceiling);
     setQuery("");
   };
   return (
@@ -132,7 +156,7 @@ export default function Catalog({
                 aria-label="Максимальна ціна"
                 type="number"
                 min={min}
-                max={10000}
+                max={ceiling}
                 value={max}
                 onChange={(e) => setMax(Number(e.target.value))}
               />
@@ -141,7 +165,7 @@ export default function Catalog({
               aria-label="Верхня межа ціни"
               type="range"
               min={0}
-              max={1000}
+              max={ceiling}
               value={max}
               onChange={(e) => setMax(Number(e.target.value))}
             />
@@ -211,11 +235,37 @@ export default function Catalog({
               <X size={12} />
             </button>
           ))}
+          {filtered.length > 0 && (
+            <nav className="catalog-pagination" aria-label="Сторінки каталогу">
+              <span>
+                Сторінка {currentPage} з {pages}
+              </span>
+              <button
+                className="button outline"
+                disabled={currentPage === 1}
+                onClick={() => setPage(currentPage - 1)}
+              >
+                Назад
+              </button>
+              <button
+                className="button outline"
+                disabled={currentPage === pages}
+                onClick={() => setPage(currentPage + 1)}
+              >
+                Далі
+              </button>
+            </nav>
+          )}
           {filtered.length ? (
             <div className="product-grid">
-              {filtered.map((p) => (
-                <ProductCard key={p.id} product={p} />
-              ))}
+              {filtered
+                .slice(
+                  (currentPage - 1) * commerce.page_size,
+                  currentPage * commerce.page_size,
+                )
+                .map((p) => (
+                  <ProductCard key={p.id} product={p} />
+                ))}
             </div>
           ) : (
             <div className="empty-state">

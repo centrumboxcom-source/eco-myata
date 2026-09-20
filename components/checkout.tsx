@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
+import { useShopConfig, usePrice } from "./shop-config";
 import Image from "next/image";
 import { ArrowRight, CheckCircle2, ShoppingBag } from "lucide-react";
 import { useShop } from "@/lib/store";
@@ -17,6 +18,8 @@ export default function Checkout({
   methods: Record<string, boolean>;
   freeShipping: number;
 }) {
+  const { commerce } = useShopConfig();
+  const money = usePrice();
   const { items, clear } = useShop();
   const [ready, setReady] = useState(false);
   const [delivery, setDelivery] = useState(
@@ -245,6 +248,12 @@ export default function Checkout({
         className="checkout-layout"
         onSubmit={async (e) => {
           e.preventDefault();
+          if (total - discount < commerce.minimum_order) {
+            setError(
+              "Мінімальна сума замовлення — " + money(commerce.minimum_order),
+            );
+            return;
+          }
           setBusy(true);
           setError("");
           const f = new FormData(e.currentTarget);
@@ -274,7 +283,13 @@ export default function Checkout({
                 warehouseRef: warehouse?.id,
                 delivery,
                 payment,
-                comment: f.get("comment"),
+                comment: String(f.get("comment") || ""),
+                custom_fields: Object.fromEntries(
+                  commerce.extra_fields.map((field) => [
+                    field.id,
+                    String(f.get("extra_" + field.id) || ""),
+                  ]),
+                ),
                 promo: discount > 0 ? promo : "",
                 consent: f.get("consent") === "on",
                 items: items.map((i) => ({
@@ -561,15 +576,62 @@ export default function Checkout({
                 </label>
               ))}
           </section>
-          <label className="field">
-            Коментар до замовлення
-            <textarea
-              name="comment"
-              rows={3}
-              maxLength={1000}
-              placeholder="Побажання щодо вашого замовлення"
-            />
-          </label>
+          {commerce.comment_enabled && (
+            <label className="field">
+              {commerce.comment_label}
+              <textarea
+                name="comment"
+                rows={3}
+                maxLength={1000}
+                placeholder="Побажання щодо вашого замовлення"
+              />
+            </label>
+          )}
+          {commerce.extra_fields.length > 0 && (
+            <section className="form-card">
+              <h2>Додаткова інформація</h2>
+              {commerce.extra_fields.map((field) => (
+                <label
+                  className={
+                    field.type === "checkbox" ? "radio-option" : "field"
+                  }
+                  key={field.id}
+                >
+                  {field.type !== "checkbox" && (
+                    <span>
+                      {field.label}
+                      {field.required ? " *" : ""}
+                    </span>
+                  )}
+                  {field.type === "textarea" ? (
+                    <textarea
+                      name={"extra_" + field.id}
+                      required={field.required}
+                      maxLength={1000}
+                    />
+                  ) : field.type === "select" ? (
+                    <select
+                      name={"extra_" + field.id}
+                      required={field.required}
+                    >
+                      <option value="">Оберіть варіант</option>
+                      {field.options.map((o, i) => (
+                        <option key={i}>{o}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      name={"extra_" + field.id}
+                      type={field.type === "checkbox" ? "checkbox" : "text"}
+                      required={field.required}
+                      maxLength={1000}
+                    />
+                  )}{" "}
+                  {field.type === "checkbox" && field.label}
+                </label>
+              ))}
+            </section>
+          )}
         </div>
         <aside className="order-summary">
           <h2>Ваше замовлення</h2>
@@ -681,8 +743,18 @@ export default function Checkout({
               {error}
             </p>
           )}
-          <button disabled={busy} className="button full">
-            {busy ? "Оформлюємо…" : "Підтвердити замовлення"}
+          {total - discount < commerce.minimum_order && (
+            <p className="notice">
+              Мінімальна сума замовлення — {money(commerce.minimum_order)}.
+              Додайте товарів ще на{" "}
+              {money(commerce.minimum_order - total + discount)}.
+            </p>
+          )}
+          <button
+            disabled={busy || total - discount < commerce.minimum_order}
+            className="button full"
+          >
+            {busy ? "Оформлюємо…" : commerce.checkout_button}
             <ArrowRight size={18} />
           </button>
         </aside>
