@@ -1,7 +1,167 @@
-import Image from 'next/image';
-import Link from 'next/link';
-import {Instagram,MessageCircle,ArrowUpRight} from 'lucide-react';
-import {serviceClient} from '@/lib/server';
-import {getSettings} from '@/lib/settings';
-export default async function Community(){const client=serviceClient();const s=await getSettings();const reviews=client?(await client.from('reviews').select('id,name,rating,body').eq('approved',true).order('created_at',{ascending:false}).limit(3)).data||[]:[];let media:{id:string;media_url:string;permalink:string;caption?:string}[]=[];if(process.env.INSTAGRAM_ACCESS_TOKEN){try{const r=await fetch('https://graph.instagram.com/me/media?fields=id,media_type,media_url,permalink,caption&limit=8',{headers:{Authorization:'Bearer '+process.env.INSTAGRAM_ACCESS_TOKEN},next:{revalidate:3600},signal:AbortSignal.timeout(5000)});const d=await r.json();media=(d.data||[]).filter((m:{media_type:string})=>m.media_type==='IMAGE').slice(0,4)}catch{}}const instagram=/^https:\/\/(www\.)?instagram\.com\//.test(s.instagram)?s.instagram:null;return <><section className="container section" style={{paddingBottom:40}}><div className="section-heading"><div><span className="eyebrow">ВАШ ДОСВІД МАЄ ЗНАЧЕННЯ</span><h2>Теплі слова про корисне.</h2></div><Link href="/account" className="underlined-link">Мій кабінет <ArrowUpRight size={16}/></Link></div>{reviews.length?<div className="reviews-grid">{reviews.map(r=><article className="review-card" key={r.id}><div className="stars" aria-label={r.rating+' із 5'}>{'★'.repeat(r.rating)}</div><p>{r.body}</p><strong>{r.name}</strong></article>)}</div>:<div className="review-invitation"><MessageCircle size={32} strokeWidth={1.3}/><div><h3>Ваша історія може бути першою</h3><p>Після покупки поділіться враженнями в особистому кабінеті.</p></div><LeafMark/></div>}</section><section className="container section" style={{paddingBottom:60}}><div className="section-heading"><div><span className="eyebrow">МАЛЕНЬКІ РАДОЩІ ЩОДНЯ</span><h2>Більше природи у вашій стрічці.</h2></div>{instagram&&<a href={instagram} target="_blank" rel="noopener noreferrer" className="underlined-link"><Instagram size={18}/> Instagram</a>}</div><div className="instagram-grid">{media.length?media.map(m=><a key={m.id} href={m.permalink} target="_blank" rel="noopener noreferrer"><Image src={m.media_url} alt={m.caption?.slice(0,140)||'Фото ЕКО М’ЯТА'} fill sizes="25vw" unoptimized/><Instagram size={23}/></a>):['tea','almond','peanut','apricot'].map((name,i)=><Link href={'/catalog?category='+['tea','nuts','oils','nuts'][i]} key={name}><Image src={'/images/'+name+'.jpg'} alt={['Чайна пауза','Природний перекус','Улюблений сніданок','Трохи солодкого'][i]} fill sizes="25vw"/><span>{['Час для себе','Прості інгредієнти','Смачні ритуали','Природна солодкість'][i]}</span></Link>)}</div></section></>}
-function LeafMark(){return <span style={{fontFamily:'Georgia',fontStyle:'italic',fontSize:22,color:'#93a47c'}}>з любов’ю</span>}
+import Image from "next/image";
+import Link from "next/link";
+import { Instagram, MessageCircle, ArrowUpRight } from "lucide-react";
+import { serviceClient } from "@/lib/server";
+import { getSettings } from "@/lib/settings";
+export default async function Community() {
+  const client = serviceClient();
+  const s = await getSettings();
+  const reviews = client
+    ? (
+        await client
+          .from("reviews")
+          .select("id,name,rating,body")
+          .eq("approved", true)
+          .order("created_at", { ascending: false })
+          .limit(3)
+      ).data || []
+    : [];
+  let media: {
+    id: string;
+    media_url: string;
+    permalink: string;
+    caption?: string;
+  }[] = [];
+  if (process.env.INSTAGRAM_ACCESS_TOKEN) {
+    try {
+      const r = await fetch(
+        "https://graph.instagram.com/me/media?fields=id,media_type,media_url,permalink,caption&limit=8",
+        {
+          headers: {
+            Authorization: "Bearer " + process.env.INSTAGRAM_ACCESS_TOKEN,
+          },
+          next: { revalidate: 3600 },
+          signal: AbortSignal.timeout(5000),
+        },
+      );
+      const d = await r.json();
+      media = (d.data || [])
+        .filter((m: { media_type: string }) => m.media_type === "IMAGE")
+        .slice(0, 4);
+    } catch {}
+  }
+  const instagram = /^https:\/\/(www\.)?instagram\.com\//.test(s.instagram)
+    ? s.instagram
+    : null;
+  return (
+    <>
+      <section className="container section" style={{ paddingBottom: 40 }}>
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">ВАШ ДОСВІД МАЄ ЗНАЧЕННЯ</span>
+            <h2>Теплі слова про корисне.</h2>
+          </div>
+          <Link href="/account" className="underlined-link">
+            Мій кабінет <ArrowUpRight size={16} />
+          </Link>
+        </div>
+        {reviews.length ? (
+          <div className="reviews-grid">
+            {reviews.map((r) => (
+              <article className="review-card" key={r.id}>
+                <div className="stars" aria-label={r.rating + " із 5"}>
+                  {"★".repeat(r.rating)}
+                </div>
+                <p>{r.body}</p>
+                <strong>{r.name}</strong>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="review-invitation">
+            <MessageCircle size={32} strokeWidth={1.3} />
+            <div>
+              <h3>Ваша історія може бути першою</h3>
+              <p>Після покупки поділіться враженнями в особистому кабінеті.</p>
+            </div>
+            <LeafMark />
+          </div>
+        )}
+      </section>
+      <section className="container section" style={{ paddingBottom: 60 }}>
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">МАЛЕНЬКІ РАДОЩІ ЩОДНЯ</span>
+            <h2>Більше природи у вашій стрічці.</h2>
+          </div>
+          {instagram && (
+            <a
+              href={instagram}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underlined-link"
+            >
+              <Instagram size={18} /> Instagram
+            </a>
+          )}
+        </div>
+        <div className="instagram-grid">
+          {media.length
+            ? media.map((m) => (
+                <a
+                  key={m.id}
+                  href={m.permalink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Image
+                    src={m.media_url}
+                    alt={m.caption?.slice(0, 140) || "Фото ЕКО М’ЯТА"}
+                    fill
+                    sizes="25vw"
+                    unoptimized
+                  />
+                  <Instagram size={23} />
+                </a>
+              ))
+            : ["tea", "almond", "peanut", "apricot"].map((name, i) => (
+                <Link
+                  href={
+                    "/catalog?category=" + ["tea", "nuts", "oils", "nuts"][i]
+                  }
+                  key={name}
+                >
+                  <Image
+                    src={"/images/" + name + ".jpg"}
+                    alt={
+                      [
+                        "Чайна пауза",
+                        "Природний перекус",
+                        "Улюблений сніданок",
+                        "Трохи солодкого",
+                      ][i]
+                    }
+                    fill
+                    sizes="25vw"
+                  />
+                  <span>
+                    {
+                      [
+                        "Час для себе",
+                        "Прості інгредієнти",
+                        "Смачні ритуали",
+                        "Природна солодкість",
+                      ][i]
+                    }
+                  </span>
+                </Link>
+              ))}
+        </div>
+      </section>
+    </>
+  );
+}
+function LeafMark() {
+  return (
+    <span
+      style={{
+        fontFamily: "Georgia",
+        fontStyle: "italic",
+        fontSize: 22,
+        color: "#93a47c",
+      }}
+    >
+      з любов’ю
+    </span>
+  );
+}

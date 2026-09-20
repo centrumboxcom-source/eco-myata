@@ -1,4 +1,25 @@
-import {serviceClient} from './server';
-export const defaultSettings={name:'ЕКО М’ЯТА',description:'Крамниця природної користі',email:'',phone:'',instagram:'',iban:'',recipient:'',seo_visible:false,np:true,ukr:true,courier:true,cod:true,mono:false,liqpay:false,bank:false,free_shipping:1500};
-export type Settings=typeof defaultSettings;
-export async function getSettings():Promise<Settings>{const client=serviceClient();if(!client)return defaultSettings;const {data,error}=await client.from('settings').select('value').eq('id','store').maybeSingle();if(error)throw error;return {...defaultSettings,...data?.value};}
+import { cache } from "react";
+import { serviceClient } from "./server";
+export { defaultSettings, type Settings } from "./store-settings";
+import {
+  defaultSettings,
+  settingsSchema,
+  type Settings,
+} from "./store-settings";
+export const getSettings = cache(async (): Promise<Settings> => {
+  const client = serviceClient();
+  if (!client) return defaultSettings;
+  const { data, error } = await client
+    .from("settings")
+    .select("value")
+    .eq("id", "store")
+    .maybeSingle();
+  if (error) throw error;
+  return settingsSchema.parse({ ...defaultSettings, ...data?.value });
+});
+
+export function siteOrigin(s: Settings) {
+  return (
+    s.site_url || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+  );
+}

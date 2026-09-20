@@ -1,9 +1,242 @@
-'use client';
-import {useEffect,useState} from 'react';
-import Link from 'next/link';
-import ReviewForm from './review-form';
-import {browserClient} from '@/lib/supabase-browser';
-import {money} from '@/lib/data';
-type Order={id:string;created_at:string;status:string;total:number};
-export default function Account({admin=false}:{admin?:boolean}){const [mode,setMode]=useState('login');const [message,setMessage]=useState('');const [busy,setBusy]=useState(false);const [email,setEmail]=useState<string|null>(null);const [orders,setOrders]=useState<Order[]>([]);const client=browserClient();useEffect(()=>{if(!client)return;client.auth.getUser().then(async({data}:{data:{user:{id:string;email?:string}|null}})=>{if(data.user){setEmail(data.user.email||'');const r=await client.from('orders').select('id,created_at,status,total').eq('user_id',data.user.id).order('created_at',{ascending:false});setOrders(r.data||[])}})},[client]);if(email)return <main className="container content-page"><div className="breadcrumb">Особистий кабінет</div><h1 className="page-title">Раді вас бачити 🌿</h1><p>{email}</p><h2>Мої замовлення</h2>{orders.length?<table className="admin-table"><thead><tr><th>Замовлення</th><th>Дата</th><th>Статус</th><th>Сума</th></tr></thead><tbody>{orders.map(o=><tr key={o.id}><td>#{o.id.slice(0,8)}</td><td>{new Date(o.created_at).toLocaleDateString('uk-UA')}</td><td>{o.status}</td><td>{money(o.total)}</td></tr>)}</tbody></table>:<p>Замовлень поки немає. Загляньте до нашої крамниці.</p>}<Link href="/catalog" className="button">До каталогу</Link><button className="text-button" onClick={async()=>{await client?.auth.signOut();setEmail(null);setOrders([])}}>Вийти</button>{orders.some(o=>o.status==='Виконано')&&<ReviewForm/>}</main>;return <main className="auth-card"><span className="eyebrow">{admin?'КЕРУВАННЯ МАГАЗИНОМ':'ВАШ ОСОБИСТИЙ ПРОСТІР'}</span><h1>{admin?'Вхід адміністратора':'Раді вас бачити'}</h1><p>Увійдіть, щоб {admin?'керувати товарами та замовленнями.':'бачити свої замовлення й зберігати улюблене.'}</p>{!admin&&<div className="auth-tabs"><button onClick={()=>setMode('login')} className={mode==='login'?'active':''}>Вхід</button><button onClick={()=>setMode('register')} className={mode==='register'?'active':''}>Реєстрація</button></div>}<form onSubmit={async e=>{e.preventDefault();setMessage('');if(!client){setMessage('Вхід відкриється після підключення Supabase.');return}setBusy(true);const f=new FormData(e.currentTarget);const credentials={email:String(f.get('email')),password:String(f.get('password'))};try{if(mode==='reset'){const {error}=await client.auth.resetPasswordForEmail(credentials.email,{redirectTo:window.location.origin+'/account/reset'});if(error)throw error;setMessage('Якщо адреса зареєстрована, на неї надійде лист для відновлення.')}else if(mode==='register'){const {error}=await client.auth.signUp(credentials);if(error)throw error;setMessage('Перевірте пошту та підтвердьте реєстрацію.')}else{const {error}=await client.auth.signInWithPassword(credentials);if(error)throw error;window.location.href=admin?'/admin':'/account'}}catch{setMessage('Не вдалося увійти. Перевірте дані або спробуйте пізніше.')}finally{setBusy(false)}}}><label className="field">Електронна пошта<input type="email" name="email" autoComplete="email" required placeholder="you@example.com"/></label>{mode!=='reset'&&<label className="field">Пароль<input type="password" name="password" autoComplete={mode==='register'?'new-password':'current-password'} minLength={8} required placeholder="Не менше 8 символів"/></label>}{message&&<p className="notice" role="status">{message}</p>}<button className="button full" disabled={busy}>{busy?'Зачекайте…':mode==='register'?'Створити обліковий запис':mode==='reset'?'Відновити пароль':'Увійти'}</button><button type="button" className="text-button" onClick={()=>setMode(mode==='reset'?'login':'reset')}>{mode==='reset'?'Повернутися до входу':'Забули пароль?'}</button></form>{admin&&<Link href="/" className="underlined-link">Повернутися до крамниці</Link>}</main>}
-
+"use client";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import ReviewForm from "./review-form";
+import { browserClient } from "@/lib/supabase-browser";
+import { money } from "@/lib/data";
+type Order = { id: string; created_at: string; status: string; total: number };
+export default function Account({ admin = false }: { admin?: boolean }) {
+  const [mode, setMode] = useState("login");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const client = browserClient();
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("error"))
+      setMessage(
+        "Посилання недійсне або прострочене. Запросіть новий лист або увійдіть.",
+      );
+    if (!client) return;
+    client.auth
+      .getUser()
+      .then(
+        async ({
+          data,
+        }: {
+          data: { user: { id: string; email?: string } | null };
+        }) => {
+          if (data.user) {
+            setEmail(data.user.email || "");
+            const r = await client
+              .from("orders")
+              .select("id,created_at,status,total")
+              .eq("user_id", data.user.id)
+              .order("created_at", { ascending: false });
+            setOrders(r.data || []);
+          }
+        },
+      );
+  }, [client]);
+  if (email && admin)
+    return (
+      <main className="auth-card">
+        <h1>Потрібні права адміністратора</h1>
+        <p>
+          Обліковий запис {email} не має доступу до керування. Власник призначає
+          роль у базі даних за інструкцією запуску.
+        </p>
+        <button
+          className="button"
+          onClick={async () => {
+            await client?.auth.signOut();
+            window.location.reload();
+          }}
+        >
+          Вийти та змінити обліковий запис
+        </button>
+        <Link href="/account">Особистий кабінет</Link>
+      </main>
+    );
+  if (email)
+    return (
+      <main className="container content-page">
+        <div className="breadcrumb">Особистий кабінет</div>
+        <h1 className="page-title">Раді вас бачити 🌿</h1>
+        <p>{email}</p>
+        <h2>Мої замовлення</h2>
+        {orders.length ? (
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Замовлення</th>
+                <th>Дата</th>
+                <th>Статус</th>
+                <th>Сума</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((o) => (
+                <tr key={o.id}>
+                  <td>#{o.id.slice(0, 8)}</td>
+                  <td>{new Date(o.created_at).toLocaleDateString("uk-UA")}</td>
+                  <td>{o.status}</td>
+                  <td>{money(o.total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p>Замовлень поки немає. Загляньте до нашої крамниці.</p>
+        )}
+        <Link href="/catalog" className="button">
+          До каталогу
+        </Link>
+        <button
+          className="text-button"
+          onClick={async () => {
+            await client?.auth.signOut();
+            setEmail(null);
+            setOrders([]);
+          }}
+        >
+          Вийти
+        </button>
+        {orders.some((o) => o.status === "Виконано") && <ReviewForm />}
+      </main>
+    );
+  return (
+    <main className="auth-card">
+      <span className="eyebrow">
+        {admin ? "КЕРУВАННЯ МАГАЗИНОМ" : "ВАШ ОСОБИСТИЙ ПРОСТІР"}
+      </span>
+      <h1>{admin ? "Вхід адміністратора" : "Раді вас бачити"}</h1>
+      <p>
+        Увійдіть, щоб{" "}
+        {admin
+          ? "керувати товарами та замовленнями."
+          : "бачити свої замовлення й зберігати улюблене."}
+      </p>
+      {!admin && (
+        <div className="auth-tabs">
+          <button
+            onClick={() => setMode("login")}
+            className={mode === "login" ? "active" : ""}
+          >
+            Вхід
+          </button>
+          <button
+            onClick={() => setMode("register")}
+            className={mode === "register" ? "active" : ""}
+          >
+            Реєстрація
+          </button>
+        </div>
+      )}
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setMessage("");
+          if (!client) {
+            setMessage("Вхід відкриється після підключення Supabase.");
+            return;
+          }
+          setBusy(true);
+          const f = new FormData(e.currentTarget);
+          const credentials = {
+            email: String(f.get("email")),
+            password: String(f.get("password")),
+          };
+          try {
+            if (mode === "reset") {
+              const { error } = await client.auth.resetPasswordForEmail(
+                credentials.email,
+                {
+                  redirectTo:
+                    window.location.origin +
+                    "/auth/callback?next=/account/reset",
+                },
+              );
+              if (error) throw error;
+              setMessage(
+                "Якщо адреса зареєстрована, на неї надійде лист для відновлення.",
+              );
+            } else if (mode === "register") {
+              const { error } = await client.auth.signUp({
+                ...credentials,
+                options: {
+                  emailRedirectTo: window.location.origin + "/auth/callback",
+                },
+              });
+              if (error) throw error;
+              setMessage("Перевірте пошту та підтвердьте реєстрацію.");
+            } else {
+              const { error } =
+                await client.auth.signInWithPassword(credentials);
+              if (error) throw error;
+              window.location.href = admin ? "/admin" : "/account";
+            }
+          } catch {
+            setMessage(
+              "Не вдалося увійти. Перевірте дані або спробуйте пізніше.",
+            );
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <label className="field">
+          Електронна пошта
+          <input
+            type="email"
+            name="email"
+            autoComplete="email"
+            required
+            placeholder="you@example.com"
+          />
+        </label>
+        {mode !== "reset" && (
+          <label className="field">
+            Пароль
+            <input
+              type="password"
+              name="password"
+              autoComplete={
+                mode === "register" ? "new-password" : "current-password"
+              }
+              minLength={8}
+              required
+              placeholder="Не менше 8 символів"
+            />
+          </label>
+        )}
+        {message && (
+          <p className="notice" role="status">
+            {message}
+          </p>
+        )}
+        <button className="button full" disabled={busy}>
+          {busy
+            ? "Зачекайте…"
+            : mode === "register"
+              ? "Створити обліковий запис"
+              : mode === "reset"
+                ? "Відновити пароль"
+                : "Увійти"}
+        </button>
+        <button
+          type="button"
+          className="text-button"
+          onClick={() => setMode(mode === "reset" ? "login" : "reset")}
+        >
+          {mode === "reset" ? "Повернутися до входу" : "Забули пароль?"}
+        </button>
+      </form>
+      {admin && (
+        <Link href="/" className="underlined-link">
+          Повернутися до крамниці
+        </Link>
+      )}
+    </main>
+  );
+}

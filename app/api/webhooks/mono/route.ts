@@ -1,4 +1,60 @@
-import {NextResponse} from 'next/server';
-import {createVerify} from 'node:crypto';
-import {serviceClient} from '@/lib/server';
-export async function POST(request:Request){const client=serviceClient();const token=process.env.MONOBANK_TOKEN,signature=request.headers.get('X-Sign');if(!client||!token||!signature)return new NextResponse(null,{status:401});const raw=await request.text();if(raw.length>65536)return new NextResponse(null,{status:413});try{const r=await fetch('https://api.monobank.ua/api/merchant/pubkey',{headers:{'X-Token':token},signal:AbortSignal.timeout(10000)});if(!r.ok)return new NextResponse(null,{status:503});const {key}=await r.json();const verify=createVerify('SHA256');verify.update(raw);verify.end();if(!verify.verify(Buffer.from(key,'base64').toString(),signature,'base64'))return new NextResponse(null,{status:401});const d=JSON.parse(raw);const {data:o}=await client.from('orders').select('id,total,payment,payment_status,status').eq('invoice_id',d.invoiceId).single();if(!o)return new NextResponse(null,{status:503});if(o.payment!=='mono'||d.ccy!==980||d.amount!==Math.round(Number(o.total)*100))return new NextResponse(null,{status:400});if(d.status==='success'&&o.payment_status!=='paid'){const {error}=await client.from('orders').update({payment_status:'paid'}).eq('id',o.id);if(error)return new NextResponse(null,{status:503})}return NextResponse.json({ok:true})}catch{return new NextResponse(null,{status:503})}}
+import { NextResponse } from "next/server";
+import { createVerify } from "node:crypto";
+import { serviceClient } from "@/lib/server";
+export async function POST(request: Request) {
+  const client = serviceClient();
+  const token = process.env.MONOBANK_TOKEN,
+    signature = request.headers.get("X-Sign");
+  if (!client || !token || !signature)
+    return new NextResponse(null, { status: 401 });
+  const raw = await request.text();
+  if (raw.length > 65536) return new NextResponse(null, { status: 413 });
+  try {
+    const r = await fetch("https://api.monobank.ua/api/merchant/pubkey", {
+      headers: { "X-Token": token },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!r.ok) return new NextResponse(null, { status: 503 });
+    const { key } = await r.json();
+    const verify = createVerify("SHA256");
+    verify.update(raw);
+    verify.end();
+    if (
+      !verify.verify(Buffer.from(key, "base64").toString(), signature, "base64")
+    )
+      return new NextResponse(null, { status: 401 });
+    const d = JSON.parse(raw);
+    const { data: o } = await client
+      .from("orders")
+      .select("id,total,payment,payment_status,status")
+      .eq("invoice_id", d.invoiceId)
+      .single();
+    if (!o) return new NextResponse(null, { status: 503 });
+    if (
+      o.payment !== "mono" ||
+      d.ccy !== 980 ||
+      d.amount !== Math.round(Number(o.total) * 100)
+    )
+      return new NextResponse(null, { status: 400 });
+    if (d.status === "success" && o.payment_status !== "paid") {
+      const { error } = await client.rpc("record_payment", {
+        p_id: o.id,
+        p_state: "paid",
+      });
+      if (error) return new NextResponse(null, { status: 503 });
+    }
+    if (
+      ["failure", "expired", "reversed"].includes(d.status) &&
+      o.payment_status !== "paid"
+    ) {
+      const { error } = await client.rpc("record_payment", {
+        p_id: o.id,
+        p_state: "failed",
+      });
+      if (error) return new NextResponse(null, { status: 503 });
+    }
+    return NextResponse.json({ ok: true });
+  } catch {
+    return new NextResponse(null, { status: 503 });
+  }
+}

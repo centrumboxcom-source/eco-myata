@@ -1,4 +1,42 @@
-import {NextResponse} from 'next/server';
-import {sessionClient} from '@/lib/server';
-import {z} from 'zod';
-export async function POST(request:Request){const client=await sessionClient();if(!client)return NextResponse.json({message:'Відгуки відкриються після запуску магазину.'},{status:503});const {data:{user}}=await client.auth.getUser();if(!user)return NextResponse.json({message:'Увійдіть, щоб залишити відгук.'},{status:401});const parsed=z.object({name:z.string().trim().min(2).max(80),rating:z.coerce.number().int().min(1).max(5),body:z.string().trim().min(10).max(2000)}).safeParse(await request.json().catch(()=>null));if(!parsed.success)return NextResponse.json({message:'Вкажіть ім’я, оцінку та відгук від 10 символів.'},{status:400});const {error}=await client.from('reviews').insert({...parsed.data,user_id:user.id,approved:false});return NextResponse.json({message:error?'Відгук можна залишити після виконаного замовлення.':'Дякуємо! Відгук з’явиться після перевірки.'},{status:error?400:200})}
+import { NextResponse } from "next/server";
+import { sessionClient } from "@/lib/server";
+import { z } from "zod";
+export async function POST(request: Request) {
+  const client = await sessionClient();
+  if (!client)
+    return NextResponse.json(
+      { message: "Відгуки відкриються після запуску магазину." },
+      { status: 503 },
+    );
+  const {
+    data: { user },
+  } = await client.auth.getUser();
+  if (!user)
+    return NextResponse.json(
+      { message: "Увійдіть, щоб залишити відгук." },
+      { status: 401 },
+    );
+  const parsed = z
+    .object({
+      name: z.string().trim().min(2).max(80),
+      rating: z.coerce.number().int().min(1).max(5),
+      body: z.string().trim().min(10).max(2000),
+    })
+    .safeParse(await request.json().catch(() => null));
+  if (!parsed.success)
+    return NextResponse.json(
+      { message: "Вкажіть ім’я, оцінку та відгук від 10 символів." },
+      { status: 400 },
+    );
+  const { error } = await client
+    .from("reviews")
+    .insert({ ...parsed.data, user_id: user.id, approved: false });
+  return NextResponse.json(
+    {
+      message: error
+        ? "Відгук можна залишити після виконаного замовлення."
+        : "Дякуємо! Відгук з’явиться після перевірки.",
+    },
+    { status: error ? 400 : 200 },
+  );
+}

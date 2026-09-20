@@ -10,7 +10,12 @@
     "build:next": "next build",
     "build:cloudflare": "opennextjs-cloudflare build",
     "test:database": "node scripts/test-database.mjs",
-    "test:search": "node scripts/test-search.mjs"
+    "test:search": "node scripts/test-search.mjs",
+    "test:merchant": "node scripts/test-merchant.mjs",
+    "test:analytics": "node scripts/test-analytics.mjs",
+    "test": "npm run test:search && npm run test:merchant && npm run test:analytics && npm run test:database",
+    "check:launch": "node scripts/check-launch.mjs",
+    "format": "prettier --write app components lib scripts middleware.ts next.config.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
@@ -29,6 +34,7 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "prettier": "^3.9.8",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.9.0"
   },

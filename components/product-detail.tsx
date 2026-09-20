@@ -1,8 +1,206 @@
-'use client';
-import {useState} from 'react';
-import {useRouter} from 'next/navigation';
-import Image from 'next/image';
-import {Check,Truck,ShieldCheck,Plus,Minus,ShoppingBag,Heart} from 'lucide-react';
-import {money,type Product,categories} from '@/lib/data';
-import {useShop} from '@/lib/store';
-export default function ProductDetail({product:p}:{product:Product}){const [qty,setQty]=useState(1);const [tab,setTab]=useState('description');const [zoom,setZoom]=useState(false);const {add,setCartOpen,toggleFavorite,favorites}=useShop();const router=useRouter();return <><div className="detail-layout"><div><div className="detail-image"><Image src={p.image} alt={p.name} fill priority sizes="(max-width:800px) 100vw,50vw" style={{objectFit:zoom?'cover':'contain'}}/></div><div className="gallery-thumbnails"><button className={!zoom?'active':''} onClick={()=>setZoom(false)} aria-label="Повне фото"><Image src={p.image} alt="Повне фото" width={72} height={72}/></button><button className={zoom?'active':''} onClick={()=>setZoom(true)} aria-label="Роздивитися деталі"><Image src={p.image} alt="Деталі продукту" width={72} height={72} style={{objectFit:'cover'}}/></button></div></div><div className="detail-info"><span className="eyebrow">{categories.find(c=>c.id===p.category)?.name}</span><h1>{p.name}</h1><span className="availability"><Check size={15}/>{p.stock?'Є в наявності':'Немає в наявності'} · {p.weight}</span><div className="tag-list">{p.tags.map(t=><span className="tag" key={t}>{t}</span>)}</div><p>{p.description}</p><div className="detail-price"><strong>{money(p.price)}</strong>{p.old_price&&<del>{money(p.old_price)}</del>}</div><div className="detail-buy"><div className="quantity"><button onClick={()=>setQty(Math.max(1,qty-1))} aria-label="Менше"><Minus size={16}/></button><span>{qty}</span><button onClick={()=>setQty(Math.min(p.stock,qty+1))} aria-label="Більше"><Plus size={16}/></button></div><button className="button" disabled={!p.stock} onClick={()=>add(p,qty)}><ShoppingBag size={18}/> Додати в кошик</button><button className="icon-button" onClick={()=>toggleFavorite(p.id)} aria-label="Додати в обране"><Heart fill={favorites.includes(p.id)?'currentColor':'none'} size={21}/></button></div><button className="button outline" disabled={!p.stock} onClick={()=>{add(p,qty);setCartOpen(false);router.push('/checkout?quick=1')}}>Купити в 1 клік</button><div className="detail-delivery"><span><Truck size={18}/> Нова пошта, Укрпошта та кур’єр по Україні</span><span><ShieldCheck size={18}/> Оплата при отриманні або онлайн</span><span><Check size={18}/> Безкоштовна доставка від 1 500 ₴</span></div></div></div><div className="detail-tabs">{[['description','Опис товару'],['ingredients','Склад'],['nutrition','Харчова цінність']].filter(([id])=>p.category!=='care'||id!=='nutrition').map(([id,label])=><button key={id} className={tab===id?'active':''} onClick={()=>setTab(id)}>{label}</button>)}</div><div className="detail-content">{tab==='description'?<p>{p.description} Зберігайте в сухому, прохолодному місці, захищеному від сонячного світла. Термін придатності дивіться на пакованні.</p>:tab==='ingredients'?<p>{p.ingredients}</p>:<><p>Орієнтовно на 100 г продукту:</p><div className="nutrition">{[['Енергія',p.nutrition.kcal+' ккал'],['Білки',p.nutrition.protein+' г'],['Жири',p.nutrition.fat+' г'],['Вуглеводи',p.nutrition.carbs+' г']].map(([label,value])=><div key={label}><small>{label}</small><strong>{value}</strong></div>)}</div></>}</div></>}
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import {
+  Check,
+  Truck,
+  ShieldCheck,
+  Plus,
+  Minus,
+  ShoppingBag,
+  Heart,
+} from "lucide-react";
+import { money, type Product, categories } from "@/lib/data";
+import { useShop } from "@/lib/store";
+import { useShopConfig } from "./shop-config";
+import AnalyticsEvent from "./analytics-event";
+import { item } from "@/lib/analytics";
+export default function ProductDetail({ product: p }: { product: Product }) {
+  const { freeShipping, categories } = useShopConfig();
+  const [photo, setPhoto] = useState(p.image);
+  const [qty, setQty] = useState(1);
+  const [tab, setTab] = useState("description");
+  const [zoom, setZoom] = useState(false);
+  const { add, setCartOpen, toggleFavorite, favorites } = useShop();
+  const router = useRouter();
+  return (
+    <>
+      <AnalyticsEvent
+        name="view_item"
+        data={{ currency: "UAH", value: p.price, items: [item(p)] }}
+      />
+      <div className="detail-layout">
+        <div>
+          <div className="detail-image">
+            <Image
+              src={photo}
+              alt={p.name}
+              fill
+              priority
+              sizes="(max-width:800px) 100vw,50vw"
+              style={{ objectFit: zoom ? "cover" : "contain" }}
+            />
+          </div>
+          <div className="gallery-thumbnails">
+            {[p.image, ...(p.additional_images || [])].map((src) => (
+              <button
+                key={src}
+                className={photo === src ? "active" : ""}
+                onClick={() => {
+                  setPhoto(src);
+                  setZoom(false);
+                }}
+                aria-label="Фото товару"
+              >
+                <Image src={src} alt="" width={72} height={72} />
+              </button>
+            ))}
+            <button
+              className={!zoom ? "active" : ""}
+              onClick={() => setZoom(false)}
+              aria-label="Повне фото"
+            >
+              <Image src={p.image} alt="Повне фото" width={72} height={72} />
+            </button>
+            <button
+              className={zoom ? "active" : ""}
+              onClick={() => setZoom(true)}
+              aria-label="Роздивитися деталі"
+            >
+              <Image
+                src={p.image}
+                alt="Деталі продукту"
+                width={72}
+                height={72}
+                style={{ objectFit: "cover" }}
+              />
+            </button>
+          </div>
+        </div>
+        <div className="detail-info">
+          <span className="eyebrow">
+            {categories.find((c) => c.id === p.category)?.name}
+          </span>
+          <h1>{p.name}</h1>
+          <span className="availability">
+            <Check size={15} />
+            {p.stock ? "Є в наявності" : "Немає в наявності"} · {p.weight}
+          </span>
+          <div className="tag-list">
+            {p.tags.map((t) => (
+              <span className="tag" key={t}>
+                {t}
+              </span>
+            ))}
+          </div>
+          <p>{p.description}</p>
+          <div className="detail-price">
+            <strong>{money(p.price)}</strong>
+            {p.old_price && <del>{money(p.old_price)}</del>}
+          </div>
+          <div className="detail-buy">
+            <div className="quantity">
+              <button
+                onClick={() => setQty(Math.max(1, qty - 1))}
+                aria-label="Менше"
+              >
+                <Minus size={16} />
+              </button>
+              <span>{qty}</span>
+              <button
+                onClick={() => setQty(Math.min(p.stock, qty + 1))}
+                aria-label="Більше"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+            <button
+              className="button"
+              disabled={!p.stock}
+              onClick={() => add(p, qty)}
+            >
+              <ShoppingBag size={18} /> Додати в кошик
+            </button>
+            <button
+              className="icon-button"
+              onClick={() => toggleFavorite(p.id)}
+              aria-label="Додати в обране"
+            >
+              <Heart
+                fill={favorites.includes(p.id) ? "currentColor" : "none"}
+                size={21}
+              />
+            </button>
+          </div>
+          <button
+            className="button outline"
+            disabled={!p.stock}
+            onClick={() => {
+              add(p, qty);
+              setCartOpen(false);
+              router.push("/checkout?quick=1");
+            }}
+          >
+            Купити в 1 клік
+          </button>
+          <div className="detail-delivery">
+            <span>
+              <Truck size={18} /> Нова пошта, Укрпошта та кур’єр по Україні
+            </span>
+            <span>
+              <ShieldCheck size={18} /> Оплата при отриманні або онлайн
+            </span>
+            <span>
+              <Check size={18} /> Безкоштовна доставка від {money(freeShipping)}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div className="detail-tabs">
+        {[
+          ["description", "Опис товару"],
+          ["ingredients", "Склад"],
+          ["nutrition", "Харчова цінність"],
+        ]
+          .filter(([id]) => p.category !== "care" || id !== "nutrition")
+          .map(([id, label]) => (
+            <button
+              key={id}
+              className={tab === id ? "active" : ""}
+              onClick={() => setTab(id)}
+            >
+              {label}
+            </button>
+          ))}
+      </div>
+      <div className="detail-content">
+        {tab === "description" ? (
+          <p>
+            {p.description} Зберігайте в сухому, прохолодному місці, захищеному
+            від сонячного світла. Термін придатності дивіться на пакованні.
+          </p>
+        ) : tab === "ingredients" ? (
+          <p>{p.ingredients}</p>
+        ) : (
+          <>
+            <p>Орієнтовно на 100 г продукту:</p>
+            <div className="nutrition">
+              {[
+                ["Енергія", p.nutrition.kcal + " ккал"],
+                ["Білки", p.nutrition.protein + " г"],
+                ["Жири", p.nutrition.fat + " г"],
+                ["Вуглеводи", p.nutrition.carbs + " г"],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <small>{label}</small>
+                  <strong>{value}</strong>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  );
+}

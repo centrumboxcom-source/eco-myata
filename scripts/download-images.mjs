@@ -1,3 +1,32 @@
-import fs from 'node:fs/promises';
-const assets=[["chia","https://images.pexels.com/photos/13613874/pexels-photo-13613874.jpeg"],["peanut","https://images.pexels.com/photos/5149342/pexels-photo-5149342.jpeg"],["tea","https://images.pexels.com/photos/6912919/pexels-photo-6912919.jpeg"],["apricot","https://images.pexels.com/photos/30089387/pexels-photo-30089387.jpeg"],["almond","https://images.pexels.com/photos/57042/pexels-photo-57042.jpeg"],["soap","https://images.pexels.com/photos/6621464/pexels-photo-6621464.jpeg"]];
-await Promise.all(assets.map(async([name,url])=>{const r=await fetch(url+'?auto=compress&cs=tinysrgb&w=1000');if(!r.ok)throw new Error(name+': '+r.status);await fs.writeFile('public/images/'+name+'.jpg',Buffer.from(await r.arrayBuffer()));console.log(name+': saved')}));
+import fs from "node:fs/promises";
+const assets = [
+  [
+    "chia",
+    "https://images.pexels.com/photos/13613874/pexels-photo-13613874.jpeg",
+  ],
+  [
+    "peanut",
+    "https://images.pexels.com/photos/5149342/pexels-photo-5149342.jpeg",
+  ],
+  ["tea", "https://images.pexels.com/photos/6912919/pexels-photo-6912919.jpeg"],
+  [
+    "apricot",
+    "https://images.pexels.com/photos/30089387/pexels-photo-30089387.jpeg",
+  ],
+  ["almond", "https://images.pexels.com/photos/57042/pexels-photo-57042.jpeg"],
+  [
+    "soap",
+    "https://images.pexels.com/photos/6621464/pexels-photo-6621464.jpeg",
+  ],
+];
+await Promise.all(
+  assets.map(async ([name, url]) => {
+    const r = await fetch(url + "?auto=compress&cs=tinysrgb&w=1000");
+    if (!r.ok) throw new Error(name + ": " + r.status);
+    await fs.writeFile(
+      "public/images/" + name + ".jpg",
+      Buffer.from(await r.arrayBuffer()),
+    );
+    console.log(name + ": saved");
+  }),
+);
