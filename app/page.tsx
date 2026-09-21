@@ -70,7 +70,7 @@ export default async function Home() {
                   href={"/category/" + c.id}
                   className="category-card"
                 >
-                  <div style={{ background: c.color || "#edf1e3" }}>
+                  <div style={c.color ? { background: c.color } : undefined}>
                     {c.image ? (
                       <Image
                         src={c.image}
