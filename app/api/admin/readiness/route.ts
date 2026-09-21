@@ -1,3 +1,4 @@
+import { integrationSecrets } from "@/lib/integration-secrets";
 import { NextResponse } from "next/server";
 import { requireAdmin, serviceClient, safeError } from "@/lib/server";
 import { getSettings, siteOrigin } from "@/lib/settings";
@@ -7,6 +8,12 @@ import { getProducts } from "@/lib/catalog";
 export async function GET() {
   try {
     await requireAdmin();
+    const keys = await integrationSecrets([
+      "NOVA_POSHTA_API_KEY",
+      "MONOBANK_TOKEN",
+      "LIQPAY_PUBLIC_KEY",
+      "LIQPAY_PRIVATE_KEY",
+    ]);
     const s = await getSettings(),
       client = serviceClient();
     const { error } = client
@@ -21,6 +28,9 @@ export async function GET() {
     const notificationCheck = client
       ? await client.from("order_notifications").select("id").limit(1)
       : { error: true };
+    const secretsCheck = client
+      ? await client.from("integration_secrets").select("id").limit(1)
+      : { error: true };
     const origin = siteOrigin(s);
     const products = (await getProducts()).filter((p) => p.merchant_enabled);
     const invalid = products
@@ -29,6 +39,12 @@ export async function GET() {
     return NextResponse.json(
       {
         checks: [
+          {
+            name: "Сховище ключів (006)",
+            ok: !secretsCheck.error,
+            detail:
+              "Міграція 006 потрібна для введення токенів через адмінку. Ключ шифрування налаштовується на хостингу.",
+          },
           {
             name: "Налаштування кошика та сповіщення (004–005)",
             ok: !commerceCheck.error && !notificationCheck.error,
@@ -87,20 +103,17 @@ export async function GET() {
           },
           {
             name: "Нова пошта API",
-            ok: !!process.env.NOVA_POSHTA_API_KEY,
-            detail: process.env.NOVA_POSHTA_API_KEY
+            ok: !!keys.NOVA_POSHTA_API_KEY,
+            detail: keys.NOVA_POSHTA_API_KEY
               ? "Ключ задано; перевірте реальний пошук."
               : "Без ключа доступне ручне введення адреси.",
           },
           {
             name: "Платежі",
             ok:
-              (!s.mono || !!process.env.MONOBANK_TOKEN) &&
+              (!s.mono || !!keys.MONOBANK_TOKEN) &&
               (!s.liqpay ||
-                !!(
-                  process.env.LIQPAY_PUBLIC_KEY &&
-                  process.env.LIQPAY_PRIVATE_KEY
-                )),
+                !!(keys.LIQPAY_PUBLIC_KEY && keys.LIQPAY_PRIVATE_KEY)),
             detail:
               "Онлайн-оплата потребує ключів, доступних callback-ів і тесту банку.",
           },

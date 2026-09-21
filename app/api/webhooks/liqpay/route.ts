@@ -1,9 +1,14 @@
+import { integrationSecrets } from "@/lib/integration-secrets";
 import { NextResponse } from "next/server";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { serviceClient } from "@/lib/server";
 export async function POST(request: Request) {
+  const keys = await integrationSecrets([
+    "LIQPAY_PRIVATE_KEY",
+    "LIQPAY_PUBLIC_KEY",
+  ]);
   const client = serviceClient(),
-    key = process.env.LIQPAY_PRIVATE_KEY;
+    key = keys.LIQPAY_PRIVATE_KEY;
   if (!client || !key) return new NextResponse(null, { status: 503 });
   const raw = await request.text();
   if (raw.length > 65536) return new NextResponse(null, { status: 413 });
@@ -30,7 +35,7 @@ export async function POST(request: Request) {
     if (
       !o ||
       o.payment !== "liqpay" ||
-      d.public_key !== process.env.LIQPAY_PUBLIC_KEY ||
+      d.public_key !== keys.LIQPAY_PUBLIC_KEY ||
       d.currency !== "UAH" ||
       Number(d.amount) !== Number(o.total)
     )

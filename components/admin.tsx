@@ -1,4 +1,5 @@
 "use client";
+import AdminSecrets from "./admin-secrets";
 import AdminNotifications from "./admin-notifications";
 import AdminCommerce from "./admin-commerce";
 import { useEffect, useState, useRef } from "react";
@@ -64,6 +65,7 @@ const nav = [
   ["subscribers", "Підписники", Users],
   ["settings", "Налаштування", Settings],
   ["notifications", "Сповіщення та листи", MessageCircle],
+  ["secrets", "Ключі сервісів", Wallet],
   ["policies", "Дані продавця та умови", BookOpen],
   ["integrations", "Google та аналітика", ChartNoAxesCombined],
   ["readiness", "Готовність до запуску", Check],
@@ -129,6 +131,7 @@ export default function Admin({ demo }: { demo: boolean }) {
       .finally(() => setLoading(false));
   }, [demo]);
   useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
     setSearch("");
     setStatus("");
     setMessage("");
@@ -479,7 +482,11 @@ export default function Admin({ demo }: { demo: boolean }) {
         )}
         <div
           className="admin-page-heading"
-          style={editor ? { display: "none" } : undefined}
+          style={
+            editor || ["settings", "secrets", "notifications"].includes(view)
+              ? { display: "none" }
+              : undefined
+          }
         >
           <div>
             <h1>
@@ -605,6 +612,8 @@ export default function Admin({ demo }: { demo: boolean }) {
             demo={demo}
             subscribers={view === "subscribers"}
           />
+        ) : view === "secrets" ? (
+          <AdminSecrets demo={demo} />
         ) : view === "notifications" ? (
           <AdminNotifications
             value={{ ...defaultSettings, ...settings }}

@@ -1,3 +1,4 @@
+import { integrationSecrets } from "@/lib/integration-secrets";
 import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { serviceClient } from "@/lib/server";
@@ -35,7 +36,12 @@ export async function POST(request: Request) {
       { status: 503 },
     );
   try {
-    if (o.payment === "mono" && process.env.MONOBANK_TOKEN) {
+    const keys = await integrationSecrets([
+      "MONOBANK_TOKEN",
+      "LIQPAY_PUBLIC_KEY",
+      "LIQPAY_PRIVATE_KEY",
+    ]);
+    if (o.payment === "mono" && keys.MONOBANK_TOKEN) {
       if (o.payment_url) return NextResponse.json({ url: o.payment_url });
       const { data: claimed, error: claimError } = await client.rpc(
         "claim_payment_attempt",
@@ -54,7 +60,7 @@ export async function POST(request: Request) {
         {
           method: "POST",
           headers: {
-            "X-Token": process.env.MONOBANK_TOKEN,
+            "X-Token": keys.MONOBANK_TOKEN,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -84,8 +90,8 @@ export async function POST(request: Request) {
     }
     if (
       o.payment === "liqpay" &&
-      process.env.LIQPAY_PUBLIC_KEY &&
-      process.env.LIQPAY_PRIVATE_KEY
+      keys.LIQPAY_PUBLIC_KEY &&
+      keys.LIQPAY_PRIVATE_KEY
     ) {
       if (!o.payment_started_at) {
         const { data: claimed, error } = await client.rpc(
@@ -101,7 +107,7 @@ export async function POST(request: Request) {
       const data = Buffer.from(
         JSON.stringify({
           version: 7,
-          public_key: process.env.LIQPAY_PUBLIC_KEY,
+          public_key: keys.LIQPAY_PUBLIC_KEY,
           action: "pay",
           amount: Number(o.total),
           currency: "UAH",
@@ -113,11 +119,7 @@ export async function POST(request: Request) {
         }),
       ).toString("base64");
       const signature = createHash("sha3-256")
-        .update(
-          process.env.LIQPAY_PRIVATE_KEY +
-            data +
-            process.env.LIQPAY_PRIVATE_KEY,
-        )
+        .update(keys.LIQPAY_PRIVATE_KEY + data + keys.LIQPAY_PRIVATE_KEY)
         .digest("base64");
       return NextResponse.json({ provider: "liqpay", data, signature });
     }

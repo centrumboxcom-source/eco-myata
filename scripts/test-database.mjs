@@ -19,6 +19,9 @@ await db.exec(
 await db.exec(
   await fs.readFile("supabase/migrations/005_order_notifications.sql", "utf8"),
 );
+await db.exec(
+  await fs.readFile("supabase/migrations/006_integration_secrets.sql", "utf8"),
+);
 await db.exec(await fs.readFile("supabase/seed.sql", "utf8"));
 assert.equal(
   (await db.query("select count(*)::int n from posts")).rows[0].n,
@@ -424,5 +427,74 @@ await assert.rejects(
 await db.exec("reset role");
 console.log(
   "PASS: checkout field validation, minimum after discount, historical field labels, notification queue deduplication, exclusive claims, uncertain delivery and private access.",
+);
+
+const actor = "00000000-0000-4000-8000-000000000002";
+const cipherFixture =
+  "encrypted-fixture-not-a-real-secret-xxxxxxxxxxxxxxxxxxxx";
+await db.query("select write_integration_secret($1,$2,$3,$4)", [
+  "NOVA_POSHTA_API_KEY",
+  cipherFixture,
+  null,
+  actor,
+]);
+const version = (
+  await db.query(
+    "select version from integration_secrets where id='NOVA_POSHTA_API_KEY'",
+  )
+).rows[0].version;
+await assert.rejects(
+  () =>
+    db.query("select write_integration_secret($1,$2,$3,$4)", [
+      "NOVA_POSHTA_API_KEY",
+      cipherFixture,
+      null,
+      actor,
+    ]),
+  /SECRET_CHANGED/,
+);
+await db.query("select write_integration_secret($1,$2,$3,$4)", [
+  "NOVA_POSHTA_API_KEY",
+  cipherFixture + "2",
+  version,
+  actor,
+]);
+await assert.rejects(
+  () =>
+    db.query("select write_integration_secret($1,$2,$3,$4)", [
+      "NOVA_POSHTA_API_KEY",
+      null,
+      version,
+      actor,
+    ]),
+  /SECRET_CHANGED/,
+);
+await db.exec("set role authenticated");
+assert.equal(
+  (await db.query("select * from integration_secrets")).rows.length,
+  0,
+);
+assert.equal(
+  (await db.query("select * from integration_secret_audit")).rows.length,
+  0,
+);
+await assert.rejects(
+  () =>
+    db.query("select write_integration_secret($1,$2,$3,$4)", [
+      "MONOBANK_TOKEN",
+      cipherFixture,
+      null,
+      actor,
+    ]),
+  /permission denied/,
+);
+await db.exec("reset role");
+assert.equal(
+  (await db.query("select count(*)::int n from integration_secret_audit"))
+    .rows[0].n,
+  2,
+);
+console.log(
+  "PASS: secret storage RLS, administrative audit, exclusive server writes and stale-update protection.",
 );
 await db.close();

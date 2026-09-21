@@ -63,6 +63,17 @@ assert.equal((await get("/api/admin/products", 503)).status, 503);
 assert.equal((await post("/api/payment", {})).status, 400);
 assert.equal((await post("/api/notifications/process", {})).status, 401);
 await get("/api/admin/notifications", 503);
+await get("/api/admin/secrets", 503);
+assert.equal(
+  (
+    await post("/api/admin/secrets", {
+      id: "NOVA_POSHTA_API_KEY",
+      value: "fake-test-value",
+      version: null,
+    })
+  ).status,
+  503,
+);
 console.log(
   "PASS: storefront, product pages, checkout, admin, metadata routes, 404, validation and disconnected-backend protections.",
 );

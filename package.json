@@ -13,11 +13,12 @@
     "test:search": "node scripts/test-search.mjs",
     "test:merchant": "node scripts/test-merchant.mjs",
     "test:analytics": "node scripts/test-analytics.mjs",
-    "test": "npm run test:search && npm run test:merchant && npm run test:analytics && npm run test:database && npm run test:admin && npm run test:commerce",
+    "test": "npm run test:search && npm run test:merchant && npm run test:analytics && npm run test:database && npm run test:admin && npm run test:commerce && npm run test:secrets",
     "check:launch": "node scripts/check-launch.mjs",
     "format": "prettier --write app components lib scripts middleware.ts next.config.ts",
     "test:admin": "node scripts/test-admin.mjs",
-    "test:commerce": "node scripts/test-commerce.mjs"
+    "test:commerce": "node scripts/test-commerce.mjs",
+    "test:secrets": "node scripts/test-secrets.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",

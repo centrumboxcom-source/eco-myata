@@ -1,3 +1,4 @@
+import { integrationSecrets } from "@/lib/integration-secrets";
 import Link from "next/link";
 import { Header, Footer } from "@/components/shop";
 import Checkout from "@/components/checkout";
@@ -8,6 +9,11 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 export default async function Page() {
+  const keys = await integrationSecrets([
+    "MONOBANK_TOKEN",
+    "LIQPAY_PRIVATE_KEY",
+    "LIQPAY_PUBLIC_KEY",
+  ]);
   const s = await getSettings();
   return (
     <>
@@ -24,11 +30,9 @@ export default async function Page() {
             ukr: s.ukr,
             courier: s.courier,
             cod: s.cod,
-            mono: s.mono && !!process.env.MONOBANK_TOKEN,
+            mono: s.mono && !!keys.MONOBANK_TOKEN,
             liqpay:
-              s.liqpay &&
-              !!process.env.LIQPAY_PRIVATE_KEY &&
-              !!process.env.LIQPAY_PUBLIC_KEY,
+              s.liqpay && !!keys.LIQPAY_PRIVATE_KEY && !!keys.LIQPAY_PUBLIC_KEY,
             bank: s.bank && !!s.iban,
           }}
           freeShipping={s.free_shipping}

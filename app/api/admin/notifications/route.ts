@@ -1,3 +1,4 @@
+import { integrationSecrets } from "@/lib/integration-secrets";
 import { NextResponse } from "next/server";
 import { requireAdmin, serviceClient, safeError } from "@/lib/server";
 import { dispatchNotifications } from "@/lib/notifications";
@@ -5,6 +6,10 @@ import { z } from "zod";
 export async function GET() {
   try {
     const { client } = await requireAdmin();
+    const keys = await integrationSecrets([
+      "TELEGRAM_BOT_TOKEN",
+      "RESEND_API_KEY",
+    ]);
     const { data, error } = await client
       .from("order_notifications")
       .select(
@@ -17,8 +22,8 @@ export async function GET() {
       {
         jobs: data,
         configured: {
-          telegram: !!process.env.TELEGRAM_BOT_TOKEN,
-          email: !!process.env.RESEND_API_KEY,
+          telegram: !!keys.TELEGRAM_BOT_TOKEN,
+          email: !!keys.RESEND_API_KEY,
         },
       },
       { headers: { "Cache-Control": "no-store" } },

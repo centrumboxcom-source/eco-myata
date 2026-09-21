@@ -1,3 +1,4 @@
+import { integrationSecrets } from "@/lib/integration-secrets";
 import { dispatchNotifications } from "@/lib/notifications";
 import { NextResponse } from "next/server";
 import { checkoutSchema } from "@/lib/validation";
@@ -36,10 +37,15 @@ export async function POST(request: Request) {
       { message: "Цей спосіб оплати або доставки зараз недоступний." },
       { status: 400 },
     );
+  const keys = await integrationSecrets([
+    "MONOBANK_TOKEN",
+    "LIQPAY_PUBLIC_KEY",
+    "LIQPAY_PRIVATE_KEY",
+  ]);
   if (
-    (v.payment === "mono" && !process.env.MONOBANK_TOKEN) ||
+    (v.payment === "mono" && !keys.MONOBANK_TOKEN) ||
     (v.payment === "liqpay" &&
-      (!process.env.LIQPAY_PUBLIC_KEY || !process.env.LIQPAY_PRIVATE_KEY)) ||
+      (!keys.LIQPAY_PUBLIC_KEY || !keys.LIQPAY_PRIVATE_KEY)) ||
     (v.payment === "bank" && !settings.iban)
   )
     return NextResponse.json(

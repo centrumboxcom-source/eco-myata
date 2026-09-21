@@ -1,3 +1,4 @@
+import { integrationSecrets } from "@/lib/integration-secrets";
 import { NextResponse } from "next/server";
 import { requireAdmin, safeError } from "@/lib/server";
 import { categorySchema } from "@/lib/product-admin";
@@ -205,6 +206,11 @@ export async function POST(
     if (resource === "reviews") {
       record = z.object({ id: z.uuid(), approved: z.boolean() }).parse(body);
     } else if (resource === "settings") {
+      const keys = await integrationSecrets([
+        "MONOBANK_TOKEN",
+        "LIQPAY_PRIVATE_KEY",
+        "LIQPAY_PUBLIC_KEY",
+      ]);
       const parsed = z
         .object({ id: z.literal("store"), value: settingsSchema })
         .parse(body);
@@ -217,9 +223,8 @@ export async function POST(
         );
       if (
         s.store_open &&
-        ((s.mono && !process.env.MONOBANK_TOKEN) ||
-          (s.liqpay &&
-            !(process.env.LIQPAY_PRIVATE_KEY && process.env.LIQPAY_PUBLIC_KEY)))
+        ((s.mono && !keys.MONOBANK_TOKEN) ||
+          (s.liqpay && !(keys.LIQPAY_PRIVATE_KEY && keys.LIQPAY_PUBLIC_KEY)))
       )
         return NextResponse.json(
           { message: "Увімкнена онлайн-оплата не має ключів на сервері." },

@@ -39,6 +39,20 @@ if (env.NEXT_PUBLIC_SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY) {
     .select("id")
     .limit(1);
   check("Міграція 005", !notifications.error);
+  const secrets = await db.from("integration_secrets").select("id");
+  check("Міграція 006", !secrets.error);
+  const hasKey = (id) =>
+    Boolean(
+      env[id] ||
+      ((secrets.data || []).some((v) => v.id === id) &&
+        env.INTEGRATIONS_ENCRYPTION_KEY),
+    );
+  if (secrets.data?.length)
+    check(
+      "Ключ шифрування задано",
+      !!env.INTEGRATIONS_ENCRYPTION_KEY,
+      "Розшифрування перевіряйте в адмінці → Ключі сервісів",
+    );
   const { data, error: e } = await db
     .from("settings")
     .select("value")
@@ -61,9 +75,12 @@ if (env.NEXT_PUBLIC_SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY) {
     check("Приймання замовлень", !!s.store_open);
     check("SEO-видимість", !!s.seo_visible);
     check("Фід Google", !!s.merchant_enabled);
-    if (s.mono) check("Monobank token", !!env.MONOBANK_TOKEN);
+    if (s.mono) check("Monobank token", hasKey("MONOBANK_TOKEN"));
     if (s.liqpay)
-      check("LiqPay keys", !!env.LIQPAY_PUBLIC_KEY && !!env.LIQPAY_PRIVATE_KEY);
+      check(
+        "LiqPay keys",
+        hasKey("LIQPAY_PUBLIC_KEY") && hasKey("LIQPAY_PRIVATE_KEY"),
+      );
     check(
       "Аналітика",
       s.analytics_mode === "ga4"

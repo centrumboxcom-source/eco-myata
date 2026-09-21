@@ -136,8 +136,7 @@ export default function AdminNotifications({
             </label>
             <p className="field-help">
               Створіть свого бота через @BotFather, додайте його в потрібний
-              чат. Токен зберігається на сервері як TELEGRAM_BOT_TOKEN. Не
-              вставляйте його в Chat ID.
+              чат. Токен додайте в розділі «Ключі сервісів». Не вставляйте його в Chat ID.
             </p>
           </section>
           <section className="preference-section">
@@ -217,7 +216,7 @@ export default function AdminNotifications({
               />
             </label>
             <p className="field-help">
-              Потрібен серверний ключ RESEND_API_KEY. Статус ключа не
+              Ключ Resend додайте в розділі «Ключі сервісів». Статус ключа не
               підтверджує доставку: результат відображається в журналі нижче.
             </p>
           </section>

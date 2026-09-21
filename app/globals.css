@@ -4355,3 +4355,144 @@ footer .text-button {
     flex-direction: column;
   }
 }
+
+.secret-setup {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin: 24px 28px;
+  padding: 18px 20px;
+  border: 1px solid #dbe6f6;
+  border-radius: 9px;
+  background: #f3f7fd;
+  color: #40648e;
+}
+.secret-setup svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.secret-setup strong {
+  font-size: 13px;
+}
+.secret-setup p {
+  font-size: 12px;
+  line-height: 1.7;
+  margin-top: 6px;
+  max-width: 850px;
+}
+.secret-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  padding: 0 28px 28px;
+}
+.secret-card {
+  padding: 22px;
+  border: 1px solid #e1e7f0;
+  border-radius: 10px;
+  min-width: 0;
+}
+.secret-card header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.secret-icon {
+  width: 39px;
+  height: 39px;
+  display: grid;
+  place-items: center;
+  background: #f0f4fd;
+  border-radius: 9px;
+  color: #3e66b8;
+}
+.secret-card header h3 {
+  font-size: 14px;
+  color: #263750;
+  margin: 4px 0;
+}
+.secret-card header small {
+  font-size: 10px;
+  color: #8692a5;
+}
+.secret-card header > span {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+.secret-card > p {
+  font-size: 12px;
+  color: #8190a4;
+  line-height: 1.7;
+  min-height: 42px;
+  margin: 18px 0;
+}
+.secret-card .field {
+  font-size: 12px;
+}
+.secret-card > small {
+  font-size: 11px;
+  color: #8b97a9;
+  line-height: 1.6;
+}
+.secret-card footer {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+.secret-card .button {
+  font-size: 12px;
+  padding: 9px 12px;
+}
+@media (max-width: 1000px) {
+  .secret-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .secret-grid {
+    padding: 0 15px 20px;
+  }
+  .secret-setup {
+    margin: 15px;
+  }
+  .secret-card {
+    padding: 16px;
+  }
+}
+
+.admin-shell .admin-sidebar {
+  overflow-x: hidden;
+}
+.admin-shell .admin-sidebar button svg {
+  flex-shrink: 0;
+}
+.secret-card footer {
+  background: transparent;
+}
+
+@media (max-width: 700px) {
+  .admin-shell .admin-sidebar {
+    overflow-x: auto;
+  }
+  .admin-page-heading {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  .admin-page-heading > div {
+    width: 100%;
+  }
+  .admin-page-heading h1 {
+    font-size: 24px;
+  }
+  .commerce-tabs {
+    scrollbar-width: none;
+  }
+  .commerce-tabs::-webkit-scrollbar {
+    display: none;
+  }
+}

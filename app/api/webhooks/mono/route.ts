@@ -1,9 +1,11 @@
+import { integrationSecrets } from "@/lib/integration-secrets";
 import { NextResponse } from "next/server";
 import { createVerify } from "node:crypto";
 import { serviceClient } from "@/lib/server";
 export async function POST(request: Request) {
+  const keys = await integrationSecrets(["MONOBANK_TOKEN"]);
   const client = serviceClient();
-  const token = process.env.MONOBANK_TOKEN,
+  const token = keys.MONOBANK_TOKEN,
     signature = request.headers.get("X-Sign");
   if (!client || !token || !signature)
     return new NextResponse(null, { status: 401 });

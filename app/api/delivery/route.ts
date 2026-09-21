@@ -1,7 +1,9 @@
+import { integrationSecrets } from "@/lib/integration-secrets";
 import { NextResponse } from "next/server";
 export async function GET(request: Request) {
+  const keys = await integrationSecrets(["NOVA_POSHTA_API_KEY"]);
   const p = new URL(request.url).searchParams,
-    key = process.env.NOVA_POSHTA_API_KEY,
+    key = keys.NOVA_POSHTA_API_KEY,
     q = (p.get("q") || "").slice(0, 100),
     city = p.get("city");
   if (!key)
