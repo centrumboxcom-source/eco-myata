@@ -524,13 +524,12 @@ input::placeholder {
 .category-card {
   text-align: center;
   padding: 24px 14px 18px;
-  background: var(--green);
-  border: 1px solid #1a3c2d;
+  background: #ffffff;
+  border: 1px solid #e5e9de;
   border-radius: 14px;
   display: flex;
   align-items: center;
   flex-direction: column;
-  color: white;
   transition:
     background 0.2s,
     border-color 0.2s,
@@ -538,9 +537,9 @@ input::placeholder {
     transform 0.2s;
 }
 .category-card:hover {
-  background: #1c3d2e;
-  border-color: #153225;
-  box-shadow: 0 10px 25px rgba(20, 48, 35, 0.4);
+  background: #f7faee;
+  border-color: #d2dfc3;
+  box-shadow: 0 8px 20px rgba(35, 76, 57, 0.08);
   transform: translateY(-4px);
 }
 .category-card > div {
@@ -549,23 +548,24 @@ input::placeholder {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  color: var(--green) !important;
-  background: #ffffff !important;
+  color: #ffffff !important;
+  background: var(--green) !important;
   margin-bottom: 18px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 12px rgba(35, 76, 57, 0.2);
+  transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
 }
 .category-card:hover > div {
+  background: #1c3e2e !important;
   transform: scale(1.06);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 6px 16px rgba(35, 76, 57, 0.3);
 }
 .category-card h3 {
-  font-size: 17px;
-  font-weight: 600;
-  max-width: 150px;
-  min-height: 46px;
-  line-height: 1.35;
-  color: #ffffff;
+  font-size: 20px;
+  font-weight: 700;
+  max-width: 170px;
+  min-height: 52px;
+  line-height: 1.25;
+  color: var(--dark);
   margin: 0;
   display: flex;
   align-items: center;
@@ -573,7 +573,7 @@ input::placeholder {
 }
 .category-card > svg {
   margin-top: 12px;
-  color: #ffffff;
+  color: var(--green);
   transition: transform 0.2s;
 }
 .category-card:hover > svg {
