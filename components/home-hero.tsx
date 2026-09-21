@@ -34,24 +34,17 @@ export default function HomeHero({
         />
       )}
       <div className="hero-content">
-        <span className="hero-kicker">
-          <span />
-          {b.eyebrow}
-        </span>
-        <h1 style={{ whiteSpace: "pre-line" }}>{b.title}</h1>
-        <p style={{ whiteSpace: "pre-line" }}>{b.text}</p>
-        {b.button && (
-          <Link href={b.href} className="button">
-            {b.button}
-            <ArrowRight size={19} />
-          </Link>
-        )}
-      </div>
-      <div className="hero-stamp">
-        <Leaf size={25} />
-        <span>
-          ЕКО<small>М’ЯТА</small>
-        </span>
+        <h1 className="hero-serif-title">
+          Натуральні
+          <br />продукти <Leaf size={55} strokeWidth={1.5} className="hero-leaf-inline" />
+          <br />для здорового життя
+        </h1>
+        <div className="hero-features-list">
+          Без цукру &bull; Без глютену &bull; Без лактози &bull; Веган
+        </div>
+        <Link href="/catalog" className="button hero-button">
+          Перейти до покупок <ArrowRight size={19} />
+        </Link>
       </div>
       {active.length > 1 && (
         <div className="hero-pagination">

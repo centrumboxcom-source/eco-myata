@@ -11,6 +11,9 @@ import {
   Flower2,
   Truck,
   ShieldCheck,
+  Heart,
+  Wheat,
+  Milk,
 } from "lucide-react";
 import { Header, Footer, ProductCard } from "@/components/shop";
 import HomeHero from "@/components/home-hero";
@@ -34,18 +37,30 @@ export default async function Home() {
         .map((id) => products.find((p) => p.id === id))
         .filter((p): p is (typeof products)[number] => !!p)
     : products.filter((p) => p.featured);
+  const categoryImageMap: Record<string, string> = {
+    superfoods: "/images/chia.jpg",
+    nuts: "/images/almond.jpg",
+    sweets: "/images/bar.jpg",
+    tea: "/images/tea.jpg",
+    oils: "/images/oil.jpg",
+    care: "/images/soap.jpg",
+  };
   const blocks: Record<string, React.ReactNode> = {
     benefits: (
-      <section className="benefits container">
-        {h.benefits.map((b, i) => {
-          const Icon = [Sprout, Leaf, Truck, ShieldCheck][i % 4];
+      <section className="benefits-pills container">
+        {[
+          { title: "Без цукру", icon: Leaf },
+          { title: "Без глютену", icon: Wheat },
+          { title: "Без лактози", icon: Milk },
+          { title: "Веган", icon: Leaf },
+          { title: "Натурально", icon: Heart },
+          { title: "З турботою про вас", icon: Sprout },
+        ].map((item, i) => {
+          const Icon = item.icon;
           return (
-            <div key={i}>
-              <Icon />
-              <span>
-                <b>{b.title}</b>
-                <small>{b.text}</small>
-              </span>
+            <div key={i} className="benefit-pill">
+              <Icon size={34} strokeWidth={2.2} />
+              <span>{item.title}</span>
             </div>
           );
         })}
@@ -54,7 +69,7 @@ export default async function Home() {
     categories: (
       <section className="section container">
         <div className="section-heading">
-          <h2>{h.categories_title}</h2>
+          <h2>{h.categories_title || "Категорії товарів"}</h2>
           <Link className="underlined-link" href="/catalog">
             Усі категорії <ArrowRight size={17} />
           </Link>
@@ -62,29 +77,27 @@ export default async function Home() {
         <div className="categories">
           {categories
             .filter((c) => !c.parent_id)
-            .map((c, i) => {
-              const Icon = icons[i % icons.length];
+            .map((c) => {
+              const bgImage = c.image || categoryImageMap[c.id] || "/images/chia.jpg";
               return (
                 <Link
                   key={c.id}
                   href={"/category/" + c.id}
                   className="category-card"
                 >
-                  <div style={c.color ? { background: c.color } : undefined}>
-                    {c.image ? (
-                      <Image
-                        src={c.image}
-                        alt={c.name}
-                        width={86}
-                        height={86}
-                        style={{ objectFit: "contain" }}
-                      />
-                    ) : (
-                      <Icon size={43} strokeWidth={1.25} />
-                    )}
+                  <div className="category-card-image">
+                    <Image
+                      src={bgImage}
+                      alt={c.name}
+                      fill
+                      sizes="(max-width: 768px) 50vw, 33vw"
+                      style={{ objectFit: "cover" }}
+                    />
                   </div>
-                  <h3>{c.name}</h3>
-                  <ArrowRight size={16} />
+                  <div className="category-card-info">
+                    <h3>{c.name}</h3>
+                    <ArrowRight size={20} className="category-card-arrow" />
+                  </div>
                 </Link>
               );
             })}
@@ -94,7 +107,10 @@ export default async function Home() {
     products: (
       <section className="section container popular">
         <div className="section-heading">
-          <h2>{h.products_title}</h2>
+          <div>
+            <h2>Ваші фаворити</h2>
+            <p className="section-subtitle">Популярні товари, які обирають найчастіше.</p>
+          </div>
           <Link className="underlined-link" href="/catalog">
             Усі товари <ArrowRight size={17} />
           </Link>

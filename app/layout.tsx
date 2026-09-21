@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
+import { Manrope } from "next/font/google";
 import "./globals.css";
+
+const font = Manrope({ subsets: ["latin", "cyrillic"] });
+
 export const dynamic = "force-dynamic";
 import ShopTools from "@/components/webmcp";
 import Analytics from "@/components/analytics";
@@ -29,6 +33,13 @@ export async function generateMetadata(): Promise<Metadata> {
     icons: { icon: "/favicon.svg" },
   };
 }
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+};
+
 export default async function RootLayout({
   children,
 }: {
@@ -40,7 +51,7 @@ export default async function RootLayout({
   ]);
   return (
     <html lang="uk">
-      <body>
+      <body className={font.className}>
         <ShopConfigProvider
           value={{
             freeShipping: settings.free_shipping,
